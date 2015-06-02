@@ -2,7 +2,7 @@
 
 Forker.py is a simple forking web server.
 
-Websocket.py is a web-socket server based on Forker.py.
+WebSocketServer.py is a web-socket server based on Forker.py.
 
 TODO:
 
