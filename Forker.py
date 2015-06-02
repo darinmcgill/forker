@@ -164,13 +164,18 @@ def serve(path,method,fields,body):
         return ok + out
 
 if __name__ == "__main__":
-    import util
-    args = util.getArgs()
-    port = args.get("port",8080)
-    if len(args): 
-        os.chdir(args[0])
+    import re,copy
+    port = 8080
+    for arg in copy.copy(sys.argv[1:]):
+        if re.match(r"^\d+$",arg):
+            port = int(arg)
+            sys.argv.remove(arg)
+    if sys.argv[1:]:
+        os.chdir(sys.argv[1])
         forker = Forker(translate(serve),port)
     else:
         forker = Forker(translate(report),port)
-    try: util.loop([forker])
+    try: 
+        while True:
+            forker()
     except KeyboardInterrupt: pass

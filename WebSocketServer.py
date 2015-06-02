@@ -186,6 +186,7 @@ if __name__ == "__main__":
     if True:
         from Forker import Forker
         forker = Forker(WebSocketServer)
-        import util
-        try: util.loop([forker])
+        try: 
+            while True:
+                forker()
         except KeyboardInterrupt: pass
