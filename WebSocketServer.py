@@ -53,7 +53,7 @@ class WebSocketServer(object):
             buff += self.soc.recv(4096)
         lines = buff.split("\r\n")
         first = lines.pop(0)
-        method,loc,prot = first.split()
+        self.method,self.loc,self.prot = first.split()
         self.fields = dict()
         for line in lines:
             if line == "": continue
