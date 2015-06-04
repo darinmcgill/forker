@@ -30,6 +30,7 @@ def _unmask(payload,mask):
 class Pong(Exception): pass
 class Ping(Exception): pass
 class Close(Exception): pass
+class Closed(Exception): pass
 
 class WebSocketServer(object):
 
@@ -75,8 +76,7 @@ class WebSocketServer(object):
 
     def recvall(self):
         # and one or more frames available to be read
-        if self.closed:
-            raise Exception("WebSocketServer closed!")
+        if self.closed: raise Closed()
         assert self.data == "", self.data
         out = list()
         self.data = self.soc.recv(4096)
@@ -86,7 +86,7 @@ class WebSocketServer(object):
             return out
         while self.data != "":
             try:
-                out.append(self.recv1())
+                out.append(self._recv1())
             except Pong:
                 if self.verbose: print "Pong!"
             except Close:
@@ -111,6 +111,7 @@ class WebSocketServer(object):
         self.closed = True
 
     def send(self,payload,kind=TEXT):
+        if self.closed: raise Closed()
         msg = chr(128 | kind)
         length = len(payload)
         if length <= 125:
@@ -125,8 +126,8 @@ class WebSocketServer(object):
         msg += payload
         self.soc.sendall(msg)
 
-    def recv1(self):
-        assert self.data, "WebSocketServer.recv1: no data?"
+    def _recv1(self):
+        assert self.data, "WebSocketServer._recv1: no data?"
         first = ord(self.data[0])
         fin = bool(first & 128)
         opcode = first & 15
@@ -178,15 +179,11 @@ class WebSocketServer(object):
         if not fin:
             if self.data == "":
                 self.data = self.soc.recv(4096)
-            payload += self.recv1()
+            payload += self._recv1()
         return payload
         
         
 if __name__ == "__main__":
-    if True:
-        from Forker import Forker
-        forker = Forker(WebSocketServer)
-        try: 
-            while True:
-                forker()
-        except KeyboardInterrupt: pass
+    try:
+        raise Exception("not implemented")
+    except KeyboardInterrupt: pass
