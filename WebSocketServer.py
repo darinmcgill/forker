@@ -182,8 +182,38 @@ class WebSocketServer(object):
             payload += self._recv1()
         return payload
         
+
+def listen(port=8081,forking=False):
+    listener = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+    listener.bind(('',port))
+    listener.listen(128)
+    while True:
+        try:
+            readyReaders,x,y = select.select([listener],[],[])
+            if readyReaders:
+                newSock, addr = listener.accept()
+            else:
+                continue
+        except KeyboardInterrupt:
+            sys.exit(0)
+        isParent = forking and os.fork()
+        if isParent:
+            newSock.close()
+        else:
+            listener.close()
+            break
+    return WebSocketServer(newSock,addr)
         
 if __name__ == "__main__":
+    wss = listen(port=8081,forking=False)
     try:
-        raise Exception("not implemented")
-    except KeyboardInterrupt: pass
+        while True:
+            r,w,e = select.select([wss,sys.stdin],[],[])
+            if wss in r:
+                for packet in wss.recvall():
+                    sys.stdout.write(packet)
+            if sys.stdin in r:
+                wss.send(sys.stdin.read(1000))
+    except KeyboardInterrupt:
+        sys.exit(0)
