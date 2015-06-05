@@ -7,6 +7,7 @@ import time
 import hashlib
 import base64
 import struct
+import select
 
 _magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _sha1 = lambda x: hashlib.sha1(x).digest()
@@ -190,8 +191,8 @@ def listen(port=8081,forking=False):
     listener.listen(128)
     while True:
         try:
-            readyReaders,x,y = select.select([listener],[],[])
-            if readyReaders:
+            r,w,e = select.select([listener],[],[])
+            if r:
                 newSock, addr = listener.accept()
             else:
                 continue
