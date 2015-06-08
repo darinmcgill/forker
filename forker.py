@@ -12,6 +12,7 @@ import datetime
 import copy
 import base64
 import hashlib
+import uuid
 
 
 def listen(port=8081,forking=True):
@@ -184,15 +185,13 @@ class Closed(Exception): pass
 
 class WebSocketServer(object):
 
-    def __init__(self,soc,addr=None,verbose=False,cb=None):
+    def __init__(self,soc):
         assert isinstance(soc,socket.socket),type(soc)
         self.soc = soc
-        self.addr = addr
-        self.verbose = verbose
-        self.handshake()
+        self.verbose = False
+        self.closed  = False
         self.data = ""
-        self.closed = False
-        self.cb = cb
+        self.handshake()
 
     def fileno(self):
         return self.soc.fileno()
@@ -213,13 +212,19 @@ class WebSocketServer(object):
             if self.verbose:
                 sys.stdout.write("=>%s<=>%s<=" % (k,v))
                 print
+        match = re.search("track=([^;]*)(;|$)",self.fields.get("cookie",""))
+        self.track = match and match.group(1)
         sig = _sign(self.fields["sec-websocket-key"])
         out = ""
         out += "HTTP/1.1 101 Switching Protocols\r\n"
         out += "Upgrade: websocket\r\n"
         out += "Connection: Upgrade\r\n"
         out += "Sec-WebSocket-Accept: %s\r\n" % sig
-        #out += "Sec-WebSocket-Protocol: chat\r\n"
+        if ((not self.track) or len(self.track) != 32 or
+             not re.match(r"^[0-9a-fA-F]+$",self.track)):
+            self.track = (uuid.uuid4().hex).replace("-","")
+            cRest = "; Expires=Wed, 13 Jan 2021 22:23:01 GMT;"
+            out += "Set-Cookie: track=" + self.track + cRest + "\r\n"
         out += "\r\n"
         self.soc.sendall(out)
         if self.verbose: print "=>%s<=" % out 
@@ -245,13 +250,6 @@ class WebSocketServer(object):
             except Ping:
                 if self.verbose: print "Ping!"
         return out
-
-    def __call__(self):
-        for msg in self.recvall():
-            if self.cb:
-                self.cb(msg)
-        if self.closed:
-            raise StopIteration()
 
     def close(self):
         if self.closed: return
