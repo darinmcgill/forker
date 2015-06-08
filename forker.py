@@ -212,19 +212,19 @@ class WebSocketServer(object):
             if self.verbose:
                 sys.stdout.write("=>%s<=>%s<=" % (k,v))
                 print
-        match = re.search("track=([^;]*)(;|$)",self.fields.get("cookie",""))
-        self.track = match and match.group(1)
+        match = re.search("dante=([^;]*)(;|$)",self.fields.get("cookie",""))
+        self.dante = match and match.group(1)
         sig = _sign(self.fields["sec-websocket-key"])
         out = ""
         out += "HTTP/1.1 101 Switching Protocols\r\n"
         out += "Upgrade: websocket\r\n"
         out += "Connection: Upgrade\r\n"
         out += "Sec-WebSocket-Accept: %s\r\n" % sig
-        if ((not self.track) or len(self.track) != 32 or
-             not re.match(r"^[0-9a-fA-F]+$",self.track)):
-            self.track = (uuid.uuid4().hex).replace("-","")
+        if ((not self.dante) or len(self.dante) != 32 or
+             not re.match(r"^[0-9a-fA-F]+$",self.dante)):
+            self.dante = (uuid.uuid4().hex).replace("-","")
             cRest = "; Expires=Wed, 13 Jan 2021 22:23:01 GMT;"
-            out += "Set-Cookie: track=" + self.track + cRest + "\r\n"
+            out += "Set-Cookie: dante=" + self.dante + cRest + "\r\n"
         out += "\r\n"
         self.soc.sendall(out)
         if self.verbose: print "=>%s<=" % out 
