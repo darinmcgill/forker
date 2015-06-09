@@ -13,6 +13,7 @@ import copy
 import base64
 import hashlib
 import uuid
+import random
 
 
 def listen(port=8081,forking=True):
@@ -20,8 +21,10 @@ def listen(port=8081,forking=True):
     listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     listener.bind(('',port))
     listener.listen(128)
+    nextId = int(time.time())
     while True:
         try:
+            while nextId >= int(time.time()): time.sleep(0.1)
             r,w,e = select.select([listener],[],[])
             if r: newSock, addr = listener.accept()
             else: continue
@@ -30,10 +33,11 @@ def listen(port=8081,forking=True):
         isParent = forking and os.fork()
         if isParent:
             newSock.close()
+            nextId += 1
         else:
             listener.close()
             break
-    return newSock,addr
+    return (newSock,addr,(port << 32) + nextId)
 
 class NotFound(Exception): pass
 
@@ -162,6 +166,12 @@ def serve(path,method,fields,body):
 _magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _sha1 = lambda x: hashlib.sha1(x).digest()
 _sign = lambda x: base64.encodestring(_sha1(x + _magic)).strip()
+WEB_MIN = 0x10000000000000
+WEB_MAX = 0x1fffffffffffff
+newId = lambda: random.randint(WEB_MIN,WEB_MAX)
+def webHash(x):
+    y = hashlib.sha512(x).hexdigest()[0:13]
+    return int(y,16) + WEB_MIN
 
 CONT  = 0
 TEXT  = 1
@@ -220,9 +230,8 @@ class WebSocketServer(object):
         out += "Upgrade: websocket\r\n"
         out += "Connection: Upgrade\r\n"
         out += "Sec-WebSocket-Accept: %s\r\n" % sig
-        if ((not self.dante) or len(self.dante) != 32 or
-             not re.match(r"^[0-9a-fA-F]+$",self.dante)):
-            self.dante = (uuid.uuid4().hex).replace("-","")
+        if not self.dante:
+            self.dante = str(newId())
             cRest = "; Expires=Wed, 13 Jan 2021 22:23:01 GMT;"
             out += "Set-Cookie: dante=" + self.dante + cRest + "\r\n"
         out += "\r\n"
