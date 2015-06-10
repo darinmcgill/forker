@@ -343,6 +343,7 @@ class WebSocketServer(object):
 if __name__ == "__main__":
     port = 8080
     forking = True
+    reporting = False
     for arg in copy.copy(sys.argv[1:]):
         if re.match(r"^\d+$",arg):
             port = int(arg)
@@ -350,8 +351,14 @@ if __name__ == "__main__":
     if "once" in sys.argv:
         forking = False
         sys.argv.remove("once")
+    if "report" in sys.argv:
+        reporting = True
+        sys.argv.remove("report")
     if sys.argv[1:]:
         assert os.path.exists(sys.argv[1])
         os.chdir(sys.argv[1])
-    sock,addr = listen(port=port,forking=forking)
-    sock.sendall(serve(*translate(sock)))
+    sock,addr,forkId = listen(port=port,forking=forking)
+    if reporting:
+        sock.sendall(report(*translate(sock)))
+    else:
+        sock.sendall(serve(*translate(sock)))
