@@ -22,16 +22,22 @@ def listen(port=8081,forking=True):
     listener.bind(('',port))
     listener.listen(128)
     nextId = int(time.time())
+    children = set()
     while True:
         try:
             while nextId >= int(time.time()): time.sleep(0.1)
-            r,w,e = select.select([listener],[],[])
+            r,w,e = select.select([listener],[],[],1)
             if r: newSock, addr = listener.accept()
-            else: continue
+            else: 
+                for child in list(children):
+                    pid,status = os.waitpid(child,os.WNOHANG)
+                    if pid: children.remove(child)
+                continue
         except KeyboardInterrupt:
             sys.exit(0)
         isParent = forking and os.fork()
         if isParent:
+            children.add(isParent)
             newSock.close()
             nextId += 1
         else:
