@@ -78,6 +78,8 @@ def report(path,method,fields,body):
 
 def resolve(path,relative=None):
     #print "resolve(%r,%r)" % (path,relative)
+    if path.endswith("/"):
+        path = path[0:(len(path)-1)]
     if relative:
         if ".." in path:
             raise NotFound("up listing not allowed")
