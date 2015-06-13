@@ -175,12 +175,6 @@ def serve(path,method,fields,body):
 _magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _sha1 = lambda x: hashlib.sha1(x).digest()
 _sign = lambda x: base64.encodestring(_sha1(x + _magic)).strip()
-WEB_MIN = 0x10000000000000
-WEB_MAX = 0x1fffffffffffff
-newId = lambda: random.randint(WEB_MIN,WEB_MAX)
-def webHash(x):
-    y = hashlib.sha512(x).hexdigest()[0:13]
-    return int(y,16) + WEB_MIN
 
 CONT  = 0
 TEXT  = 1
