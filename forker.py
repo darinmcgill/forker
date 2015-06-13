@@ -36,6 +36,7 @@ def listen(port=8081,forking=True):
         except KeyboardInterrupt:
             sys.exit(0)
         isParent = forking and os.fork()
+        random.seed()
         if isParent:
             children.add(isParent)
             newSock.close()
@@ -78,7 +79,7 @@ def report(path,method,fields,body):
 
 def resolve(path,relative=None):
     #print "resolve(%r,%r)" % (path,relative)
-    if path.endswith("/"):
+    if path.endswith("/") and path != "/":
         path = path[0:(len(path)-1)]
     if relative:
         if ".." in path:
@@ -230,18 +231,12 @@ class WebSocketServer(object):
             if self.verbose:
                 sys.stdout.write("=>%s<=>%s<=" % (k,v))
                 print
-        match = re.search("dante=([^;]*)(;|$)",self.fields.get("cookie",""))
-        self.dante = match and match.group(1)
         sig = _sign(self.fields["sec-websocket-key"])
         out = ""
         out += "HTTP/1.1 101 Switching Protocols\r\n"
         out += "Upgrade: websocket\r\n"
         out += "Connection: Upgrade\r\n"
         out += "Sec-WebSocket-Accept: %s\r\n" % sig
-        if not self.dante:
-            self.dante = str(newId())
-            cRest = "; Expires=Wed, 13 Jan 2021 22:23:01 GMT;"
-            out += "Set-Cookie: dante=" + self.dante + cRest + "\r\n"
         out += "\r\n"
         self.soc.sendall(out)
         if self.verbose: print "=>%s<=" % out 
