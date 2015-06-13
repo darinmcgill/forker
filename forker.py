@@ -48,7 +48,7 @@ def listen(port=8081,forking=True):
 
 class NotFound(Exception): pass
 
-def translate(soc):
+def translate(soc,addr,forkId):
     buff = ""
     while "\r\n\r\n" not in buff:
         buff += soc.recv(4096)
@@ -63,9 +63,9 @@ def translate(soc):
     if "content-length" in fields:
         while len(body) < int(fields["content-length"]):
             body += soc.recv(4096)
-    return (path,method,fields,body)
+    return (path,method,fields,body,addr[0])
 
-def report(path,method,fields,body):
+def report(path,method,fields,body,ip):
     out = "HTTP/1.0 200 OK\r\n"
     out += "Content-type: text/plain\r\n\r\n"
     out += str(datetime.datetime.now())
@@ -136,7 +136,7 @@ def getListing(resolved,raw):
     out += "</pre></font></body></html>"
     return out
 
-def serve(path,method,fields,body):
+def serve(path,method,fields,body,ip):
     ok = "HTTP/1.0 200 OK\r\n"
     eol = "\r\n"
     things = path.split("?",1)
@@ -156,6 +156,7 @@ def serve(path,method,fields,body):
     os.environ["HTTP_REFERER"] = fields.get("referer","")
     os.environ["CONTENT_TYPE"] = fields.get("content-type","")
     os.environ["HTTP_HOST"] = fields.get("host","")
+    os.environ["REMOTE_ADDR"] = ip
     from subprocess import Popen,PIPE
     child = Popen(resolved,stdin=PIPE,stdout=PIPE)
     out,err = child.communicate(body or "")
@@ -356,6 +357,6 @@ if __name__ == "__main__":
         os.chdir(sys.argv[1])
     sock,addr,forkId = listen(port=port,forking=forking)
     if reporting:
-        sock.sendall(report(*translate(sock)))
+        sock.sendall(report(*translate(sock,addr,forkId)))
     else:
-        sock.sendall(serve(*translate(sock)))
+        sock.sendall(serve(*translate(sock,addr,forkId)))
