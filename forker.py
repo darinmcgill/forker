@@ -208,7 +208,12 @@ class WebSocketServer(object):
         self.handshake()
 
     def fileno(self):
-        return self.soc.fileno()
+        try:
+            return self.soc.fileno()
+        except socket.error:
+            self.soc.close()
+            self.closed = True
+            raise Closed()
 
     def handshake(self):
         buff = ""
