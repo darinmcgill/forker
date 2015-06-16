@@ -14,6 +14,7 @@ import base64
 import hashlib
 import uuid
 import random
+import struct
 
 
 def listen(port=8081,forking=True):
