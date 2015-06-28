@@ -138,6 +138,7 @@ def getListing(resolved,raw):
     return out
 
 def serve(path,method,fields,body,ip):
+    print repr([str(datetime.datetime.now()),path,method,ip])
     ok = "HTTP/1.0 200 OK\r\n"
     eol = "\r\n"
     things = path.split("?",1)
