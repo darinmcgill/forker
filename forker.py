@@ -346,7 +346,7 @@ class WebSocketServer(object):
 
 if __name__ == "__main__":
     port = 8080
-    forking = True
+    forking = (os.name == 'posix')
     reporting = False
     for arg in copy.copy(sys.argv[1:]):
         if re.match(r"^\d+$",arg):
