@@ -285,7 +285,7 @@ class WebSocketServer(object):
             else:
                 msg += chr(127)
                 msg += struct.pack(">Q",length)
-        msg += payload
+        msg += str(payload)
         self.soc.sendall(msg)
 
     def _recv1(self):
