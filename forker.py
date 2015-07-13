@@ -204,18 +204,14 @@ class WebSocketServer(object):
     def __init__(self,soc):
         assert isinstance(soc,socket.socket),type(soc)
         self.soc = soc
+        self.fd = soc.fileno()
         self.verbose = False
         self.closed  = False
         self.data = ""
         self.handshake()
 
     def fileno(self):
-        try:
-            return self.soc.fileno()
-        except socket.error:
-            self.soc.close()
-            self.closed = True
-            raise Closed()
+        return self.fd
 
     def handshake(self):
         buff = ""
@@ -244,7 +240,7 @@ class WebSocketServer(object):
         if self.verbose: print "=>%s<=" % out 
 
     def recvall(self):
-        # and one or more frames available to be read
+        # returns a list of strings
         if self.closed: raise Closed()
         assert self.data == "", self.data
         out = list()
@@ -268,9 +264,13 @@ class WebSocketServer(object):
     def close(self):
         if self.closed: return
         msg = chr(128 | 8) + chr(0)
-        self.soc.sendall(msg)
-        self.soc.close()
-        self.closed = True
+        try:
+            self.soc.sendall(msg)
+        except:
+            pass
+        finally:
+            self.soc.close()
+            self.closed = True
 
     def send(self,payload,kind=TEXT):
         if self.closed: raise Closed()
@@ -342,13 +342,18 @@ class WebSocketServer(object):
             if self.data == "":
                 self.data = self.soc.recv(4096)
             payload += self._recv1()
-        return payload
+        if opcode == BIN:
+            return bytearray(payload)
+        if opcode == TEXT:
+            return payload
+        raise Exception("bad opcode")
         
 
 if __name__ == "__main__":
     port = 8080
     forking = (os.name == 'posix')
     reporting = False
+    ws = False
     for arg in copy.copy(sys.argv[1:]):
         if re.match(r"^\d+$",arg):
             port = int(arg)
@@ -359,11 +364,22 @@ if __name__ == "__main__":
     if "report" in sys.argv:
         reporting = True
         sys.argv.remove("report")
+    if "ws" in sys.argv:
+        ws = True
+        sys.argv.remove("ws")
     if sys.argv[1:]:
         assert os.path.exists(sys.argv[1])
         os.chdir(sys.argv[1])
     sock,addr,forkId = listen(port=port,forking=forking)
     if reporting:
         sock.sendall(report(*translate(sock,addr,forkId)))
+    elif ws:
+        print "running WebSocketServer in echo mode"
+        ws = WebSocketServer(sock)
+        while True:
+            for thing in ws.recvall():
+                print "echoing: %r" % thing
+                how = BIN if isinstance(thing,bytearray) else TEXT
+                ws.send(thing,how)
     else:
         sock.sendall(serve(*translate(sock,addr,forkId)))
