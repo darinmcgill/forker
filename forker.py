@@ -210,6 +210,9 @@ class WebSocketServer(object):
         self.data = ""
         self.handshake()
 
+    def __hash__(self):
+        return id(self)
+
     def fileno(self):
         return self.fd
 
@@ -217,6 +220,7 @@ class WebSocketServer(object):
         buff = ""
         while "\r\n\r\n" not in buff:
             buff += self.soc.recv(4096)
+        self.lastRecv = time.time()
         lines = buff.split("\r\n")
         first = lines.pop(0)
         self.method,self.loc,self.prot = first.split()
@@ -237,6 +241,7 @@ class WebSocketServer(object):
         out += "Sec-WebSocket-Accept: %s\r\n" % sig
         out += "\r\n"
         self.soc.sendall(out)
+        self.lastSend = time.time()
         if self.verbose: print "=>%s<=" % out 
 
     def recvall(self):
@@ -245,6 +250,7 @@ class WebSocketServer(object):
         assert self.data == "", self.data
         out = list()
         self.data = self.soc.recv(4096)
+        self.lastRecv = time.time()
         if self.data == "":
             self.soc.close()
             self.closed = True
@@ -272,6 +278,9 @@ class WebSocketServer(object):
             self.soc.close()
             self.closed = True
 
+    def ping(self,payload=""):
+        self.send(payload,kind=PING)
+
     def send(self,payload,kind=TEXT):
         if self.closed: raise Closed()
         msg = chr(128 | kind)
@@ -287,6 +296,7 @@ class WebSocketServer(object):
                 msg += struct.pack(">Q",length)
         msg += str(payload)
         self.soc.sendall(msg)
+        self.lastSend = time.time()
 
     def _recv1(self):
         assert self.data, "WebSocketServer._recv1: no data?"
@@ -322,6 +332,7 @@ class WebSocketServer(object):
             print "length=",length
         while len(self.data) < offset + length:
             self.data += self.soc.recv(4096)
+            self.lastRecv = time.time()
             if self.verbose: print "reading more..."
         payload = self.data[offset:(offset+length)]
         if len(self.data) == offset + length:
@@ -341,6 +352,7 @@ class WebSocketServer(object):
         if not fin:
             if self.data == "":
                 self.data = self.soc.recv(4096)
+                self.lastRecv = time.time()
             payload += self._recv1()
         if opcode == BIN:
             return bytearray(payload)
