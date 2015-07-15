@@ -15,6 +15,7 @@ import hashlib
 import uuid
 import random
 import struct
+import random
 
 
 def listen(port=8081,forking=True):
@@ -199,6 +200,8 @@ class Ping(Exception): pass
 class Close(Exception): pass
 class Closed(Exception): pass
 
+countWebSocketServer = 0
+
 class WebSocketServer(object):
 
     def __init__(self,soc):
@@ -209,6 +212,9 @@ class WebSocketServer(object):
         self.closed  = False
         self.data = ""
         self.handshake()
+        global countWebSocketServer
+        countWebSocketServer += 1
+        self.instance = countWebSocketServer
 
     def __hash__(self):
         return id(self)
