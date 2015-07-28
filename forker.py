@@ -148,7 +148,7 @@ def serve(path,method,fields,body,ip):
     except NotFound: return "HTTP/1.0 404 Not Found\r\n\r\n404 Not Found"
     if os.path.isdir(resolved): return getListing(resolved,rel)
     if not executable(resolved): 
-        if method == "POST": 
+        if False and method == "POST": 
             return "HTTP/1.0 500 Not Executable\r\n\r\n500 Not Executable"
             #return report(path,method,fields,body,ip)
         else: return ok + eol + open(resolved).read()
