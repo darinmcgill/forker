@@ -148,7 +148,9 @@ def serve(path,method,fields,body,ip):
     except NotFound: return "HTTP/1.0 404 Not Found\r\n\r\n404 Not Found"
     if os.path.isdir(resolved): return getListing(resolved,rel)
     if not executable(resolved): 
-        if method == "POST": return report(path,method,fields,body)
+        if method == "POST": 
+            return "HTTP/1.0 500 Not Executable\r\n\r\n500 Not Executable"
+            #return report(path,method,fields,body,ip)
         else: return ok + eol + open(resolved).read()
     if things[1:]: os.environ["QUERY_STRING"] = things[1]
     os.environ["REQUEST_METHOD"] = method
@@ -168,13 +170,20 @@ def serve(path,method,fields,body,ip):
         out += "Content-type: text/plain\r\n\r\n"
         out += "non-zero return code\n\n"
         return(out)
-    if "\r\n\r\n" not in out:
-        out = out.replace("\n\n","\r\n\r\n")
-    if out.startswith("Location"):
-        out = "HTTP/1.0 302 Found\r\n" + out
-        return out
-    else:
-        return ok + out
+    m = re.match(r"^(.*?)\n\r?\n(.*)$",out,re.S)
+    if not m: 
+        return "HTTP/1.0 500 Bad Header\r\n\r\n500 Bad Header"
+    header = m.group(1)
+    body = m.group(2)
+    lines = re.split("\r?\n",header)
+    status = ok
+    header = ""
+    for line in lines:
+        if re.match(r"^status:\s*\d\d\d.*$",line,re.I):
+            status = "HTTP/1.0 " + line.split(":")[1] + "\r\n"
+        else:
+            header += line + "\r\n"
+    return status + header + "\r\n" + body
 
 _magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _sha1 = lambda x: hashlib.sha1(x).digest()
