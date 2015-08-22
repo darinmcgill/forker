@@ -87,16 +87,18 @@ def report(path,method,fields,body,ip,port):
     out += '    "body": "%s"\n}' % (body,)
     return out
 
-def resolve(path,relative=None):
-    #print "resolve(%r,%r)" % (path,relative)
+def resolve(path,relative):
+    print "resolve(%r,%r)" % (path,relative)
     if path.endswith("/") and path != "/":
         path = path[0:(len(path)-1)]
-    if relative:
-        if ".." in path:
-            raise NotFound("up listing not allowed")
-        if not re.match(r"^[0-9a-zA-Z_\-/.]+$",path):
-            raise NotFound("invalid path: %s" % path)
-        path = relative + "/" + path
+    if ".." in path:
+        raise NotFound("up listing not allowed")
+    if not re.match(r"^[0-9a-zA-Z_\-/.]+$",path):
+        raise NotFound("invalid path: %s" % path)
+    if path == "/":
+        path = relative
+    else:
+        path = os.path.join(relative,*(path.split("/")))
     if not os.path.exists(path):
         print "doesn't exist: %s" % path
         if path.endswith("/"): raise NotFound("ABC")
@@ -123,7 +125,7 @@ def readable(path):
     return bool(stat.S_IROTH & mode)
 
 def getListing(resolved,raw):
-    #print "getListing(%r,%r)" % (resolved,raw)
+    print "getListing(%r,%r)" % (resolved,raw)
     assert os.path.isdir(resolved)
     out = "HTTP/1.0 200 OK\r\n"
     out += "Content-type: text/html\r\n\r\n"
@@ -141,7 +143,7 @@ def getListing(resolved,raw):
         elif os.path.islink(thing): d = "@"
         elif executable(thing): d = "*"
         else: d = ""
-        last = thing.split("/")[-1]
+        last = os.path.basename(thing)
         out += "\t<a href='%s%s'>%s</a>%s\n" % (raw,last,last,d)
     out += "</pre></font></body></html>"
     return out
