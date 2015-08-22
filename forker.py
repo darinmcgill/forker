@@ -17,6 +17,7 @@ import random
 import struct
 import random
 
+_now = lambda: str(datetime.datetime.now())
 
 def listen(port=8081,forking=True):
     listener = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -44,13 +45,12 @@ def listen(port=8081,forking=True):
             newSock.close()
             nextId += 1
         else:
-            listener.close()
-            break
-    return (newSock,addr,(port << 32) + nextId)
+            if forking: listener.close()
+            yield (newSock,addr,(port << 32) + nextId)
 
 class NotFound(Exception): pass
 
-def translate(soc,addr,forkId):
+def translate(soc,addr,forkId,port):
     buff = ""
     while "\r\n\r\n" not in buff:
         buff += soc.recv(4096)
@@ -65,18 +65,26 @@ def translate(soc,addr,forkId):
     if "content-length" in fields:
         while len(body) < int(fields["content-length"]):
             body += soc.recv(4096)
-    return (path,method,fields,body,addr[0])
+    return (path,method,fields,body,addr[0],port)
 
-def report(path,method,fields,body,ip):
+def report(path,method,fields,body,ip,port):
     out = "HTTP/1.0 200 OK\r\n"
     out += "Content-type: text/plain\r\n\r\n"
-    out += str(datetime.datetime.now())
-    out += "\n\npath=%s\n" % path 
-    out += "method=%s\n" % method
-    for k,v in fields.items():
-        out += ">%s<=>%s<\n" % (k,v)
-    out += "body=>%s<=\n" % body
-    out += "len = %d" % len(body)
+    out += """{
+    "ts": "%s",
+    "path": "%s",
+    "method": "%s",
+    "fields": {""" % (_now(),path,method)
+    first = True
+    for k,v in sorted(fields.items()):
+        if first:
+            out += '\n         "%s": "%s"' % (k,v)
+            first = False
+        else:
+            out += '\n        ,"%s": "%s"' % (k,v)
+    out += "\n    },\n"
+    out += '    "length": %s,\n' % (len(body),)
+    out += '    "body": "%s"\n}' % (body,)
     return out
 
 def resolve(path,relative=None):
@@ -122,7 +130,7 @@ def getListing(resolved,raw):
     out += """
     <html><head><title>directory listing</title>
     <style>
-    pre {font-size: x-large;}
+    pre {font-size: large;}
     </style>
     </head><body>
     <pre>Contents:
@@ -138,21 +146,33 @@ def getListing(resolved,raw):
     out += "</pre></font></body></html>"
     return out
 
-def serve(path,method,fields,body,ip):
-    print repr([str(datetime.datetime.now()),path,method,ip])
+def serve(path,method,fields,body,ip,port):
+    print repr([_now(),path,method,fields.get("x-real-ip") or ip])
     ok = "HTTP/1.0 200 OK\r\n"
     eol = "\r\n"
     things = path.split("?",1)
     rel = things[0]
     try: resolved = resolve(rel,os.getcwd())
     except NotFound: return "HTTP/1.0 404 Not Found\r\n\r\n404 Not Found"
-    if os.path.isdir(resolved): return getListing(resolved,rel)
+    if os.path.isdir(resolved): 
+        if "x-forwarded-uri" in fields:
+            rel = fields["x-forwarded-uri"]
+        return getListing(resolved,rel)
     if not executable(resolved): 
         if False and method == "POST": 
             return "HTTP/1.0 500 Not Executable\r\n\r\n500 Not Executable"
             #return report(path,method,fields,body,ip)
         else: return ok + eol + open(resolved).read()
+    for k in os.environ.keys():
+        if k in ["PATH","PYTHONPATH"]: continue
+        del os.environ[k]
     if things[1:]: os.environ["QUERY_STRING"] = things[1]
+    os.environ["SERVER_SOFTWARE"] = "forker.py/20150821"
+    os.environ["SERVER_NAME"] = socket.gethostname()
+    os.environ["SERVER_PORT"] = str(port)
+    os.environ["SERVER_PROTOCOL"] = "HTTP/1.0"
+    os.environ["CONTENT_LENGTH"] = str(len(body)) if body else ""
+    os.environ["GATEWAY_INTERFACE"] = "CGI/1.1"
     os.environ["REQUEST_METHOD"] = method
     os.environ["SCRIPT_NAME"] = rel
     os.environ["HTTP_USER_AGENT"] = fields.get("user-agent","")
@@ -162,6 +182,12 @@ def serve(path,method,fields,body,ip):
     os.environ["CONTENT_TYPE"] = fields.get("content-type","")
     os.environ["HTTP_HOST"] = fields.get("host","")
     os.environ["REMOTE_ADDR"] = ip
+    os.environ["HTTP_X_REAL_IP"] = fields.get("x-real-ip","")
+    os.environ["HTTP_X_FORWARDED_FOR"] = fields.get("x-forwarded-for","")
+    os.environ["HTTP_X_FORWARDED_HOST"] = fields.get("x-forwarded-host","")
+    os.environ["HTTP_X_FORWARDED_URI"] = fields.get("x-forwarded-uri","")
+    os.environ["HTTP_X_FORWARDED_REQUEST_URI"] = fields.get(
+        "x-forwarded-request-uri","")
     from subprocess import Popen,PIPE
     child = Popen(resolved,stdin=PIPE,stdout=PIPE)
     out,err = child.communicate(body or "")
@@ -385,9 +411,9 @@ if __name__ == "__main__":
         if re.match(r"^\d+$",arg):
             port = int(arg)
             sys.argv.remove(arg)
-    if "once" in sys.argv:
+    if "nofork" in sys.argv:
         forking = False
-        sys.argv.remove("once")
+        sys.argv.remove("nofork")
     if "report" in sys.argv:
         reporting = True
         sys.argv.remove("report")
@@ -397,16 +423,16 @@ if __name__ == "__main__":
     if sys.argv[1:]:
         assert os.path.exists(sys.argv[1])
         os.chdir(sys.argv[1])
-    sock,addr,forkId = listen(port=port,forking=forking)
-    if reporting:
-        sock.sendall(report(*translate(sock,addr,forkId)))
-    elif ws:
-        print "running WebSocketServer in echo mode"
-        ws = WebSocketServer(sock)
-        while True:
-            for thing in ws.recvall():
-                print "echoing: %r" % thing
-                how = BIN if isinstance(thing,bytearray) else TEXT
-                ws.send(thing,how)
-    else:
-        sock.sendall(serve(*translate(sock,addr,forkId)))
+    for sock,addr,forkId in listen(port=port,forking=forking):
+        if ws:
+            print "running WebSocketServer in echo mode"
+            ws = WebSocketServer(sock)
+            while True:
+                for thing in ws.recvall():
+                    print "echoing: %r" % thing
+                    how = BIN if isinstance(thing,bytearray) else TEXT
+                    ws.send(thing,how)
+        elif reporting: sock.sendall(report(*translate(sock,addr,forkId,port)))
+        else: sock.sendall(serve(*translate(sock,addr,forkId,port)))
+        sock.close()
+        if forking: sys.exit(0)
