@@ -88,33 +88,29 @@ def report(path,method,fields,body,ip,port):
     return out
 
 def resolve(path,relative):
-    print "resolve(%r,%r)" % (path,relative)
-    if path.endswith("/") and path != "/":
-        path = path[0:(len(path)-1)]
-    if ".." in path:
-        raise NotFound("up listing not allowed")
-    if not re.match(r"^[0-9a-zA-Z_\-/.]+$",path):
-        raise NotFound("invalid path: %s" % path)
-    if path == "/":
-        path = relative
-    else:
-        path = os.path.join(relative,*(path.split("/")))
-    if not os.path.exists(path):
-        print "doesn't exist: %s" % path
-        if path.endswith("/"): raise NotFound("ABC")
-        matches = glob.glob(path + ".*")
-        if not matches: raise NotFound("XYZ")
-        if len(matches) > 1: raise NotFound("resolve ambiguous")
-        path = matches[0]
-    if os.path.islink(path):
-        path = os.path.realpath(path)
-        if not os.path.exists(path): raise NotFound("MNQ")
-    if os.path.isdir(path):
-        for index in [path+"/index.html",path+"/index"]:
-            if os.path.exists(index): return resolve(index)
-    if not readable(path): 
-        raise NotFound("%s not readable" % path)
-    return path
+    #print "resolve(%r,%r)" % (path,relative)
+    if isinstance(path,(str,unicode)):
+        path = [p for p in path.split("/") if p]
+    assert isinstance(path,list)
+    assert os.path.exists(relative),relative
+    if os.path.islink(relative):
+        return resolve(path,os.path.realpath(relative))
+    if os.path.isfile(relative):
+        return relative
+    assert os.path.isdir(relative),relative
+    if len(path) == 0:
+        try: return resolve(["index"],relative)
+        except: return relative
+    name = path.pop(0)
+    contents = os.listdir(relative) # does not include ".." and "."
+    if name in contents:
+        return resolve(path,os.path.join(relative,name))
+    matches = [x for x in contents if x.startswith(name + ".")]
+    if len(matches) == 1:
+        return resolve([],os.path.join(relative,matches[0]))
+    if len(matches) > 1:
+        raise NotFound("ambiguous:" + os.path.join(relative,name))
+    raise NotFound(os.path.join(relative,name))
 
 def executable(path):
     mode = os.stat(path).st_mode
