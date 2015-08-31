@@ -88,7 +88,7 @@ def report(path,method,fields,body,ip,port):
     return out
 
 def resolve(path,relative):
-    #print "resolve(%r,%r)" % (path,relative)
+    print "resolve(%r,%r)" % (path,relative)
     if isinstance(path,(str,unicode)):
         path = [p for p in path.split("/") if p]
     assert isinstance(path,list)
@@ -186,6 +186,10 @@ def serve(path,method,fields,body,ip,port):
     os.environ["HTTP_X_FORWARDED_URI"] = fields.get("x-forwarded-uri","")
     os.environ["HTTP_X_FORWARDED_REQUEST_URI"] = fields.get(
         "x-forwarded-request-uri","")
+    if "Basic" in fields.get("authorization",""):
+        second = fields["authorization"].split()[1]
+        user = base64.decodestring(second).split(":")[0]
+        os.environ["HTTP_X_AUTH_USER"] = user
     from subprocess import Popen,PIPE
     child = Popen(resolved,stdin=PIPE,stdout=PIPE)
     out,err = child.communicate(body or "")
