@@ -144,6 +144,23 @@ def getListing(resolved,raw):
     out += "</pre></font></body></html>"
     return out
 
+typeMap = dict(
+    html="text/html",
+    htm="text/html",
+    css="text/css",
+    txt="text/plain",
+    xml="text/xml",
+    manifest="text/cache-manifest",
+    appcache="text/cache-manifest",
+    pdf="application/pdf",
+)
+
+def typeLine(fn):
+    for k,v in typeMap.items():
+        if fn.endswith("." + k):
+            return "Content-type: " + v + "\r\n"
+    return "" # let the browser guess
+
 def serve(path,method,fields,body,ip,port):
     print repr([_now(),path,method,fields.get("x-real-ip") or ip])
     ok = "HTTP/1.0 200 OK\r\n"
@@ -160,7 +177,8 @@ def serve(path,method,fields,body,ip,port):
         if False and method == "POST": 
             return "HTTP/1.0 500 Not Executable\r\n\r\n500 Not Executable"
             #return report(path,method,fields,body,ip)
-        else: return ok + eol + open(resolved).read()
+        else: 
+            return ok + typeLine(resolved) + eol + open(resolved).read()
     for k in os.environ.keys():
         if k in ["PATH","PYTHONPATH"]: continue
         del os.environ[k]
