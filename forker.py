@@ -270,7 +270,6 @@ class WebSocketServer(object):
         global countWebSocketServer
         countWebSocketServer += 1
         self.instance = countWebSocketServer
-        self.timeout = None
 
     def __hash__(self):
         return id(self)
@@ -309,15 +308,12 @@ class WebSocketServer(object):
     def recvall(self, timeout=None):
         # returns a list of strings
         if self.closed: raise Closed()
-        if timeout != self.timeout:
-            self.soc.settimeout(timeout)
-            self.timeout = timeout
         assert self.data == "", self.data
         out = list()
-        try:
-            self.data = self.soc.recv(4096)
-        except socket.error:
+        rlist, wlist, xlist = select.select([self.fd],[],[],timeout)
+        if not rlist: # timeout
             return list()
+        self.data = self.soc.recv(4096)
         self.lastRecv = time.time()
         if self.data == "":
             self.soc.close()
@@ -363,6 +359,7 @@ class WebSocketServer(object):
                 msg += chr(127)
                 msg += struct.pack(">Q",length)
         msg += str(payload)
+        rlist, wlist, xlist = select.select([],[self.fd],[])
         self.soc.sendall(msg)
         self.lastSend = time.time()
 
