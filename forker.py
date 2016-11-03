@@ -18,9 +18,11 @@ import random
 if sys.version_info >= (3,0):
     unicode = str
 
+
 _now = lambda: str(datetime.datetime.now())
 
-def listen(port=8081,forking=True):
+
+def listen(port=8081, forking=True):
     listener = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     listener.bind(('',port))
