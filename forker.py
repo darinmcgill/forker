@@ -1,9 +1,9 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
+from __future__ import print_function
 import sys
 import socket
 import select
 import os
-import datetime
 import time
 import glob
 import stat
@@ -12,10 +12,11 @@ import datetime
 import copy
 import base64
 import hashlib
-import uuid
-import random
 import struct
 import random
+
+if sys.version_info >= (3,0):
+    unicode = str
 
 _now = lambda: str(datetime.datetime.now())
 
@@ -88,8 +89,8 @@ def report(path,method,fields,body,ip,port):
     return out
 
 def resolve(path,relative):
-    print "resolve(%r,%r)" % (path,relative)
-    if isinstance(path,(str,unicode)):
+    print("resolve(%r,%r)" % (path,relative))
+    if isinstance(path,(unicode, bytes)):
         path = [p for p in path.split("/") if p]
     assert isinstance(path,list)
     assert os.path.exists(relative),relative
@@ -121,7 +122,7 @@ def readable(path):
     return bool(stat.S_IROTH & mode)
 
 def getListing(resolved,raw):
-    print "getListing(%r,%r)" % (resolved,raw)
+    print("getListing(%r,%r)" % (resolved,raw))
     assert os.path.isdir(resolved)
     out = "HTTP/1.0 200 OK\r\n"
     out += "Content-type: text/html\r\n\r\n"
@@ -162,7 +163,7 @@ def typeLine(fn):
     return "" # let the browser guess
 
 def serve(path,method,fields,body,ip,port):
-    print repr([_now(),path,method,fields.get("x-real-ip") or ip])
+    print(repr([_now(),path,method,fields.get("x-real-ip") or ip]))
     ok = "HTTP/1.0 200 OK\r\n"
     eol = "\r\n"
     things = path.split("?",1)
@@ -206,7 +207,7 @@ def serve(path,method,fields,body,ip,port):
         "x-forwarded-request-uri","")
     if "Basic" in fields.get("authorization",""):
         second = fields["authorization"].split()[1]
-        user = base64.decodestring(second).split(":")[0]
+        user = base64.decodebytes(second).split(":")[0]
         os.environ["HTTP_X_AUTH_USER"] = user
     from subprocess import Popen,PIPE
     child = Popen(resolved,stdin=PIPE,stdout=PIPE)
@@ -303,7 +304,7 @@ class WebSocketServer(object):
         out += "\r\n"
         self.soc.sendall(out)
         self.lastSend = time.time()
-        if self.verbose: print "=>%s<=" % out 
+        if self.verbose: print("=>%s<=" % out)
 
     def recvall(self, timeout=None):
         # returns a list of strings
@@ -323,12 +324,12 @@ class WebSocketServer(object):
             try:
                 out.append(self._recv1())
             except Pong:
-                if self.verbose: print "Pong!"
+                if self.verbose: print("Pong!")
             except Close:
                 self.data = ""
                 self.close()
             except Ping:
-                if self.verbose: print "Ping!"
+                if self.verbose: print("Ping!")
         return out
 
     def close(self):
@@ -387,28 +388,28 @@ class WebSocketServer(object):
             mask = self.data[offset:(offset+4)]
             offset += 4
         if self.verbose:
-            print "-------------"
-            print "fin=",fin
-            print "rsv1=",rsv1
-            print "rsv2=",rsv2
-            print "rsv3=",rsv3
-            print "opcode=",opcode
-            print "masking=",masking
-            print "length=",length
+            print("-------------")
+            print("fin=",fin)
+            print("rsv1=",rsv1)
+            print("rsv2=",rsv2)
+            print("rsv3=",rsv3)
+            print("opcode=",opcode)
+            print("masking=",masking)
+            print("length=",length)
         while len(self.data) < offset + length:
             self.data += self.soc.recv(4096)
             self.lastRecv = time.time()
-            if self.verbose: print "reading more..."
+            if self.verbose: print("reading more...")
         payload = self.data[offset:(offset+length)]
         if len(self.data) == offset + length:
-            if self.verbose: print "perfect length"
+            if self.verbose: print("perfect length")
             self.data = ""
         else:
-            if self.verbose: print "extra stuff"
+            if self.verbose: print("extra stuff")
             self.data = self.data[(offset+length):len(self.data)]
         if masking:
             payload = _unmask(payload,mask)
-        if self.verbose: print "payload=>%s<=" % payload
+        if self.verbose: print("payload=>%s<=" % payload)
         if opcode == PONG: raise Pong()
         if opcode == CLOSE: raise Close(payload)
         if opcode == PING:
@@ -447,13 +448,13 @@ if __name__ == "__main__":
     if sys.argv[1:]:
         assert os.path.exists(sys.argv[1])
         os.chdir(sys.argv[1])
-    for sock,addr,forkId in listen(port=port,forking=forking):
+    for sock, addr, forkId in listen(port=port,forking=forking):
         if ws:
-            print "running WebSocketServer in echo mode"
+            print("running WebSocketServer in echo mode")
             ws = WebSocketServer(sock)
             while True:
                 for thing in ws.recvall():
-                    print "echoing: %r" % thing
+                    print("echoing: %r" % thing)
                     how = BIN if isinstance(thing,bytearray) else TEXT
                     ws.send(thing,how)
         elif reporting: sock.sendall(report(*translate(sock,addr,forkId,port)))
