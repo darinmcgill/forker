@@ -51,28 +51,39 @@ def listen(port=8081, forking=True):
             if forking: listener.close()
             yield (newSock,addr,(port << 32) + nextId)
 
-class NotFound(Exception): pass
 
-def translate(soc,addr,forkId,port):
-    buff = ""
-    while "\r\n\r\n" not in buff:
-        buff += soc.recv(4096)
-    header,body = buff.split("\r\n\r\n")
-    lines = header.split("\r\n")
-    first = lines.pop(0)
-    method,path,prot = first.split()
-    fields = dict()
-    for line in lines:
-        a,b = line.split(":",1)
-        fields[a.strip().lower()] = b.strip()
-    if "content-length" in fields:
-        while len(body) < int(fields["content-length"]):
-            body += soc.recv(4096)
-    return (path,method,fields,body,addr[0],port)
+class NotFound(Exception):
+    pass
+
+
+class Request(object):
+    #__slots__ = "addr port fork_id header method port prot body fields".split()
+
+    def __init__(self, sock, addr=("", 0), fork_id=None):
+        self.remote_ip = addr[0]
+        self.port = addr[1]
+        self.fork_id = fork_id
+        buff = b""
+        match = None
+        while not match:
+            buff += sock.recv(4096)
+            match = re.match(b"(.*?)\r?\n\r?\n(.*)", buff, re.MULTILINE)
+        self.header, self.body = match.groups()
+        print(self.header)
+        return
+        lines = self.header.split(b"\r\n")
+        first = lines.pop(0)
+        self.method, self.path, self.prot = first.split()
+        self.fields = dict()
+        for line in lines:
+            a, b = line.split(b":", 1)
+            self.fields[a.strip().lower()] = b.strip()
+        if b"content-length" in self.fields:
+            while len(self.body) < int(self.fields[b"content-length"]):
+                self.body += sock.recv(4096)
+
 
 def report(path,method,fields,body,ip,port):
-    out = "HTTP/1.0 200 OK\r\n"
-    out += "Content-type: text/plain\r\n\r\n"
     out += """{
     "ts": "%s",
     "path": "%s",
@@ -158,13 +169,15 @@ typeMap = dict(
     pdf="application/pdf",
 )
 
+
 def typeLine(fn):
     for k,v in typeMap.items():
         if fn.endswith("." + k):
             return "Content-type: " + v + "\r\n"
     return "" # let the browser guess
 
-def serve(path,method,fields,body,ip,port):
+
+def serve(request):
     print(repr([_now(),path,method,fields.get("x-real-ip") or ip]))
     ok = "HTTP/1.0 200 OK\r\n"
     eol = "\r\n"
@@ -427,30 +440,31 @@ class WebSocketServer(object):
         if opcode == TEXT:
             return payload
         raise Exception("bad opcode")
-        
 
-if __name__ == "__main__":
+
+def main(*args):
     port = 8080
     forking = (os.name == 'posix')
     reporting = False
     ws = False
-    for arg in copy.copy(sys.argv[1:]):
+    for arg in args:
         if re.match(r"^\d+$",arg):
             port = int(arg)
-            sys.argv.remove(arg)
-    if "nofork" in sys.argv:
-        forking = False
-        sys.argv.remove("nofork")
-    if "report" in sys.argv:
-        reporting = True
-        sys.argv.remove("report")
-    if "ws" in sys.argv:
-        ws = True
-        sys.argv.remove("ws")
-    if sys.argv[1:]:
-        assert os.path.exists(sys.argv[1])
-        os.chdir(sys.argv[1])
-    for sock, addr, forkId in listen(port=port,forking=forking):
+            continue
+        if arg == "nofork":
+            forking = False
+            continue
+        if arg == "report":
+            reporting = True
+            continue
+        if arg == "ws":
+            ws = True
+            continue
+        if os.path.exists(arg):
+            os.chdir(arg)
+            continue
+
+    for sock, addr, fork_id in listen(port=port, forking=forking):
         if ws:
             print("running WebSocketServer in echo mode")
             ws = WebSocketServer(sock)
@@ -459,7 +473,19 @@ if __name__ == "__main__":
                     print("echoing: %r" % thing)
                     how = BIN if isinstance(thing,bytearray) else TEXT
                     ws.send(thing,how)
-        elif reporting: sock.sendall(report(*translate(sock,addr,forkId,port)))
-        else: sock.sendall(serve(*translate(sock,addr,forkId,port)))
+        else:
+            request = Request(sock, addr, fork_id=fork_id)
+            if reporting:
+                out = b"HTTP/1.0 200 OK\r\n"
+                out += b"Content-type: text/plain\r\n\r\n"
+                out += str(request).encode()
+                sock.sendall(out)
+            else:
+                sock.sendall(serve(request))
         sock.close()
-        if forking: sys.exit(0)
+        if forking:
+            sys.exit(0)
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])
