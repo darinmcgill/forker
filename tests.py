@@ -5,15 +5,11 @@ import socket
 
 example_requst = b"""GET /abc?xyz HTTP/1.1
 Host: localhost:8080
-Connection: keep-alive
-Pragma: no-cache
-Cache-Control: no-cache
 Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
 Accept-Encoding: gzip, deflate, sdch, br
 Accept-Language: en-US,en;q=0.8
-Cookie: Webstorm-197f4332=9586c36a-05ab-4fbe-afa7-267c446cf027
+Cookie:trail=6231214290744395; scent=6457421329820405
 
 """
 
@@ -33,12 +29,14 @@ class TestRequest(unittest.TestCase):
         client, server = socket.socketpair()
         client.send(example_requst)
         request = forker.Request(sock=server)
+        client.close()
+        server.close()
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.path, "/abc?xyz")
         self.assertEqual(request.headers["host"], "localhost:8080")
         self.assertFalse(request.body)
-        client.close()
-        server.close()
+        self.assertEqual(request.cookies.get("scent"), "6457421329820405")
+        self.assertEqual(request.cookies.get("trail"), "6231214290744395")
 
 
 if __name__ == "__main__":

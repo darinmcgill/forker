@@ -23,6 +23,16 @@ def _to_str(thing):
         return thing
     if isinstance(thing,bytes):
         return thing.decode()
+    raise Exception("unexpected:" + str(thing))
+
+
+def _to_bytes(thing):
+    if isinstance(thing, bytes):
+        return thing
+    if isinstance(thing, unicode):
+        return thing.encode()
+    raise Exception("unexpected:" + str(thing))
+
 
 _now = lambda: str(datetime.datetime.now())
 
@@ -32,13 +42,14 @@ def listen(port=8081, forking=True):
     listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     listener.bind(('',port))
     listener.listen(128)
-    nextId = int(time.time())
+    next_id = int(time.time())
     children = set()
     while True:
         try:
-            while nextId >= int(time.time()): time.sleep(0.1)
+            while next_id >= int(time.time()): time.sleep(0.1)
             r,w,e = select.select([listener],[],[],1)
-            if r: newSock, addr = listener.accept()
+            if r:
+                new_sock, addr = listener.accept()
             else: 
                 for child in list(children):
                     pid,status = os.waitpid(child,os.WNOHANG)
@@ -50,11 +61,11 @@ def listen(port=8081, forking=True):
         random.seed()
         if isParent:
             children.add(isParent)
-            newSock.close()
-            nextId += 1
+            new_sock.close()
+            next_id += 1
         else:
             if forking: listener.close()
-            yield (newSock,addr,(port << 32) + nextId)
+            yield (new_sock,addr,(port << 32) + next_id)
 
 
 class NotFound(Exception):
@@ -63,7 +74,7 @@ class NotFound(Exception):
 
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
-                 "path", "headers", "body",)
+                 "path", "headers", "cookies", "body",)
 
     def __init__(self, **kwargs):
         if "sock" not in kwargs:
@@ -87,38 +98,29 @@ class Request(object):
             for line in lines:
                 a, b = line.split(":", 1)
                 self.headers[a.strip().lower()] = b.strip()
+            self.cookies = dict()
+            if "cookie" in self.headers:
+                for cookie in re.split(";\s*", self.headers["cookie"]):
+                    k, v = cookie.strip().split("=")
+                    self.cookies[k] = v
             if "content-length" in self.headers:
                 while len(self.body) < int(self.headers["content-length"]):
                     self.body += sock.recv(4096)
 
-    def __repr__(self, sep=","):
-        out = "Request("
+    def render(self, start, sep, end):
+        out = start
         for key in self.__slots__:
             out += "%s=%r%s" % (key, getattr(self, key), sep)
-        out += ")"
+        out += end
         return out
 
+    def __repr__(self):
+        return self.render(sep=",", start="Request(", end=")")
+
     def __str__(self):
-        return self.__repr__(",\n\n")
+        bar = ("-" * 40) + "\n"
+        return self.render(sep="\n\n", start=bar, end=bar)
 
-
-def report(path,method,fields,body,ip,port):
-    out += """{
-    "ts": "%s",
-    "path": "%s",
-    "method": "%s",
-    "fields": {""" % (_now(),path,method)
-    first = True
-    for k,v in sorted(fields.items()):
-        if first:
-            out += '\n         "%s": "%s"' % (k,v)
-            first = False
-        else:
-            out += '\n        ,"%s": "%s"' % (k,v)
-    out += "\n    },\n"
-    out += '    "length": %s,\n' % (len(body),)
-    out += '    "body": "%s"\n}' % (body,)
-    return out
 
 def resolve(path,relative):
     print("resolve(%r,%r)" % (path,relative))
@@ -497,8 +499,9 @@ def main(*args):
             if reporting:
                 out = b"HTTP/1.0 200 OK\r\n"
                 out += b"Content-type: text/plain\r\n\r\n"
-                out += str(request).encode()
+                out += _to_bytes(str(request))
                 sock.sendall(out)
+                print(request)
             else:
                 sock.sendall(serve(request))
         sock.close()
