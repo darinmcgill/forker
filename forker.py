@@ -34,7 +34,8 @@ def _to_bytes(thing):
     raise Exception("unexpected:" + str(thing))
 
 
-_now = lambda: str(datetime.datetime.now())
+def _now():
+    return str(datetime.datetime.now())
 
 
 def listen(port=8081, forking=True):
@@ -46,8 +47,9 @@ def listen(port=8081, forking=True):
     children = set()
     while True:
         try:
-            while next_id >= int(time.time()): time.sleep(0.1)
-            r,w,e = select.select([listener],[],[],1)
+            while next_id >= int(time.time()):
+                time.sleep(0.1)
+            r, w, e = select.select([listener], [], [], 1)
             if r:
                 new_sock, addr = listener.accept()
             else: 
@@ -57,15 +59,16 @@ def listen(port=8081, forking=True):
                 continue
         except KeyboardInterrupt:
             sys.exit(0)
-        isParent = forking and os.fork()
+        is_parent = forking and os.fork()
         random.seed()
-        if isParent:
-            children.add(isParent)
+        if is_parent:
+            children.add(is_parent)
             new_sock.close()
             next_id += 1
         else:
-            if forking: listener.close()
-            yield (new_sock,addr,(port << 32) + next_id)
+            if forking:
+                listener.close()
+            yield (new_sock, addr, (port << 32) + next_id)
 
 
 class NotFound(Exception):
@@ -147,13 +150,16 @@ def resolve(path,relative):
         raise NotFound("ambiguous:" + os.path.join(relative,name))
     raise NotFound(os.path.join(relative,name))
 
+
 def executable(path):
     mode = os.stat(path).st_mode
     return bool(stat.S_IXOTH & mode)
 
+
 def readable(path):
     mode = os.stat(path).st_mode
     return bool(stat.S_IROTH & mode)
+
 
 def getListing(resolved,raw):
     print("getListing(%r,%r)" % (resolved,raw))
@@ -179,6 +185,7 @@ def getListing(resolved,raw):
     out += "</pre></font></body></html>"
     return out
 
+
 typeMap = dict(
     html="text/html",
     htm="text/html",
@@ -191,11 +198,11 @@ typeMap = dict(
 )
 
 
-def typeLine(fn):
-    for k,v in typeMap.items():
+def type_line(fn):
+    for k, v in typeMap.items():
         if fn.endswith("." + k):
             return "Content-type: " + v + "\r\n"
-    return "" # let the browser guess
+    return ""  # let the browser guess
 
 
 def serve(request):
@@ -215,7 +222,7 @@ def serve(request):
             return "HTTP/1.0 500 Not Executable\r\n\r\n500 Not Executable"
             #return report(path,method,fields,body,ip)
         else: 
-            return ok + typeLine(resolved) + eol + open(resolved).read()
+            return ok + type_line(resolved) + eol + open(resolved).read()
     for k in os.environ.keys():
         if k in ["PATH","PYTHONPATH"]: continue
         del os.environ[k]
@@ -279,6 +286,7 @@ CLOSE = 8
 PING  = 9
 PONG  = 10
 
+
 def _unmask(payload,mask):
     indv = list()
     abcd = map(ord,mask)
@@ -286,6 +294,7 @@ def _unmask(payload,mask):
         j = i % 4
         indv.append(chr(abcd[j] ^ ord(payload[i])))
     return "".join(indv)
+
 
 class Pong(Exception): pass
 class Ping(Exception): pass

@@ -3,7 +3,7 @@ import unittest
 import forker
 import socket
 
-example_requst = b"""GET /abc?xyz HTTP/1.1
+example_request = b"""GET /abc?xyz HTTP/1.1
 Host: localhost:8080
 Upgrade-Insecure-Requests: 1
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
@@ -27,7 +27,7 @@ class TestRequest(unittest.TestCase):
 
     def test_request(self):
         client, server = socket.socketpair()
-        client.send(example_requst)
+        client.send(example_request)
         request = forker.Request(sock=server)
         client.close()
         server.close()
