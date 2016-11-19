@@ -3,7 +3,7 @@ import unittest
 import forker
 import socket
 
-example_requst = """GET /abc?xyz HTTP/1.1
+example_requst = b"""GET /abc?xyz HTTP/1.1
 Host: localhost:8080
 Connection: keep-alive
 Pragma: no-cache
@@ -34,7 +34,11 @@ class TestRequest(unittest.TestCase):
         client.send(example_requst)
         request = forker.Request(sock=server)
         self.assertEqual(request.method, "GET")
-
+        self.assertEqual(request.path, "/abc?xyz")
+        self.assertEqual(request.headers["host"], "localhost:8080")
+        self.assertFalse(request.body)
+        client.close()
+        server.close()
 
 
 if __name__ == "__main__":

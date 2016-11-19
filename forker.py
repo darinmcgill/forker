@@ -9,7 +9,6 @@ import glob
 import stat
 import re
 import datetime
-import copy
 import base64
 import hashlib
 import struct
@@ -18,6 +17,12 @@ import random
 if sys.version_info >= (3,0):
     unicode = str
 
+
+def _to_str(thing):
+    if isinstance(thing,str):
+        return thing
+    if isinstance(thing,bytes):
+        return thing.decode()
 
 _now = lambda: str(datetime.datetime.now())
 
@@ -57,30 +62,44 @@ class NotFound(Exception):
 
 
 class Request(object):
-    #__slots__ = "addr port fork_id header method port prot body fields".split()
+    __slots__ = ("request_id", "remote_ip", "protocol", "method",
+                 "path", "headers", "body",)
 
-    def __init__(self, sock, addr=("", 0), fork_id=None):
-        self.remote_ip = addr[0]
-        self.port = addr[1]
-        self.fork_id = fork_id
-        buff = b""
-        match = None
-        while not match:
-            buff += sock.recv(4096)
-            match = re.match(b"(.*?)\r?\n\r?\n(.*)", buff, re.MULTILINE)
-        self.header, self.body = match.groups()
-        print(self.header)
-        return
-        lines = self.header.split(b"\r\n")
-        first = lines.pop(0)
-        self.method, self.path, self.prot = first.split()
-        self.fields = dict()
-        for line in lines:
-            a, b = line.split(b":", 1)
-            self.fields[a.strip().lower()] = b.strip()
-        if b"content-length" in self.fields:
-            while len(self.body) < int(self.fields[b"content-length"]):
-                self.body += sock.recv(4096)
+    def __init__(self, **kwargs):
+        if "sock" not in kwargs:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+        else:
+            sock = kwargs["sock"]
+            self.remote_ip = kwargs.get("remote_ip")
+            self.request_id = kwargs.get("request_id")
+            buff = b""
+            match = None
+            while not match:
+                buff += sock.recv(4096)
+                match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", buff, re.S)
+            header_block = _to_str(match.group(1))
+            self.body = match.group(2)
+            lines = re.split("\\r?\\n", header_block)
+            first = lines.pop(0)
+            self.method, self.path, self.protocol = first.split()
+            self.headers = dict()
+            for line in lines:
+                a, b = line.split(":", 1)
+                self.headers[a.strip().lower()] = b.strip()
+            if "content-length" in self.headers:
+                while len(self.body) < int(self.headers["content-length"]):
+                    self.body += sock.recv(4096)
+
+    def __repr__(self, sep=","):
+        out = "Request("
+        for key in self.__slots__:
+            out += "%s=%r%s" % (key, getattr(self, key), sep)
+        out += ")"
+        return out
+
+    def __str__(self):
+        return self.__repr__(",\n\n")
 
 
 def report(path,method,fields,body,ip,port):
@@ -474,7 +493,7 @@ def main(*args):
                     how = BIN if isinstance(thing,bytearray) else TEXT
                     ws.send(thing,how)
         else:
-            request = Request(sock, addr, fork_id=fork_id)
+            request = Request(sock=sock, remote_ip=addr[0], request_id=fork_id)
             if reporting:
                 out = b"HTTP/1.0 200 OK\r\n"
                 out += b"Content-type: text/plain\r\n\r\n"
