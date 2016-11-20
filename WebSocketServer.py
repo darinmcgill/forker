@@ -12,12 +12,42 @@ from Request import Request
 _magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
+def my_ord(x):
+    """
+    :param x: usually a character, sometimes a number
+    :return: an integer corresponding to the character input
+    """
+    if isinstance(x, int):
+        return x
+    return ord(x)
+
+
+def my_chr(x, _z=bytearray(1)):
+    """
+    :param x: integer
+    :param _z:
+    :return: byte
+    """
+    _z[0] = x
+    return bytes(_z)
+
+
 def _sha1(x):
-    return hashlib.sha1(x).digest()
+    assert isinstance(x, bytes)
+    # print("x=%s" % x)
+    out = hashlib.sha1(x).digest()
+    # print("out=%s" % out)
+    assert isinstance(out, bytes)
+    return out
 
 
 def _sign(x):
-    return base64.encodestring(_sha1(x + _magic)).strip()
+    # return base64.encodestring().strip()
+    digested = _sha1(x + _magic)
+    # print("len-digested=", len(digested))
+    out = base64.standard_b64encode(digested)
+    # print("encoded64 => ", repr(out))
+    return out
 
 
 def _ignore(*a, **b):
@@ -33,11 +63,11 @@ PONG = 10
 
 def _unmask(payload, mask):
     indv = list()
-    abcd = list(map(ord, mask))
+    abcd = list(map(my_ord, mask))
     for i in range(len(payload)):
         j = i % 4
-        indv.append(chr(abcd[j] ^ ord(payload[i])))
-    return "".join(indv)
+        indv.append(my_chr(abcd[j] ^ my_ord(payload[i])))
+    return b"".join(indv)
 
 
 class Pong(Exception):
@@ -79,7 +109,7 @@ class WebSocketServer(object):
         out += b"HTTP/1.1 101 Switching Protocols\r\n"
         out += b"Upgrade: websocket\r\n"
         out += b"Connection: Upgrade\r\n"
-        out += ("Sec-WebSocket-Accept: %s\r\n" % sig).encode()
+        out += b"Sec-WebSocket-Accept: " + sig + b"\r\n"
         out += b"\r\n"
         self.soc.sendall(out)
         self.lastSend = time.time()
@@ -127,7 +157,7 @@ class WebSocketServer(object):
     def close(self):
         if self.closed:
             return
-        msg = chr(128 | 8) + chr(0)
+        msg = my_chr(128 | 8) + my_chr(0)
         try:
             self.soc.sendall(msg)
         except:
@@ -142,18 +172,18 @@ class WebSocketServer(object):
     def send(self, payload, kind=TEXT):
         if self.closed:
             raise Closed()
-        msg = chr(128 | kind)
+        msg = my_chr(128 | kind)
         length = len(payload)
         if length <= 125:
-            msg += chr(length)
+            msg += my_chr(length)
         else:
             if length <= 65535:
-                msg += chr(126)
+                msg += my_chr(126)
                 msg += struct.pack(">H", length)
             else:
-                msg += chr(127)
+                msg += my_chr(127)
                 msg += struct.pack(">Q", length)
-        msg += str(payload)
+        msg += bytes(payload)
         rlist, wlist, xlist = select.select([], [self.fd], [])
         _ignore(rlist, wlist, xlist)
         self.soc.sendall(msg)
@@ -161,13 +191,13 @@ class WebSocketServer(object):
 
     def _recv1(self):
         assert self.data, "WebSocketServer._recv1: no data?"
-        first = ord(self.data[0])
+        first = my_ord(self.data[0])
         fin = bool(first & 128)
         opcode = first & 15
         rsv1 = bool(first & 64)
         rsv2 = bool(first & 32)
         rsv3 = bool(first & 16)
-        second = ord(self.data[1])
+        second = my_ord(self.data[1])
         masking = bool(second & 128)
         len0 = second & 127
         offset = 2
@@ -233,7 +263,7 @@ if __name__ == "__main__":
     from listen import listen
     for sock1, addr in listen(port=8080, forking=False):
         print("running WebSocketServer in echo mode", file=sys.stderr)
-        ws = WebSocketServer(sock1, verbose=True)
+        ws = WebSocketServer(sock1)
         while True:
             for thing in ws.recvall():
                 print("echoing: %r" % thing)
