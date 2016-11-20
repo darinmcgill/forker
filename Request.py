@@ -144,7 +144,7 @@ class Request(object):
             if "x-forwarded-uri" in self.headers:
                 self.requested_path = self.headers["x-forwarded-uri"]
             return Request.get_listing(resolved, self.requested_path)
-        if Request.executable(resolved):
+        if Request.is_executable(resolved):
             return self.cgi(resolved)
         if self.method == "GET":
             return Request.OK + Request.type_line(resolved) + b"\r\n" + open(resolved, "rb").read()
@@ -170,7 +170,7 @@ class Request(object):
                 d = "/"
             elif os.path.islink(thing):
                 d = "@"
-            elif Request.executable(thing):
+            elif Request.is_executable(thing):
                 d = "*"
             else:
                 d = ""
@@ -208,7 +208,7 @@ class Request(object):
         raise KeyError(os.path.join(relative, name))
 
     @staticmethod
-    def executable(path):
+    def is_executable(path):
         mode = os.stat(path).st_mode
         return bool(stat.S_IXOTH & mode)
 

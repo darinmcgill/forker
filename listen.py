@@ -1,6 +1,5 @@
 from __future__ import print_function
 import socket
-import time
 import select
 import os
 import sys
@@ -12,12 +11,9 @@ def listen(port=8081, forking=True):
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind(('', port))
     listener.listen(128)
-    next_id = int(time.time())
     children = set()
     while True:
         try:
-            while next_id >= int(time.time()):
-                time.sleep(0.1)
             r, w, e = select.select([listener], [], [], 1)
             if r:
                 new_sock, addr = listener.accept()
@@ -34,8 +30,7 @@ def listen(port=8081, forking=True):
         if is_parent:
             children.add(is_parent)
             new_sock.close()
-            next_id += 1
         else:
             if forking:
                 listener.close()
-            yield (new_sock, addr, (port << 32) + next_id)
+            yield (new_sock, addr)

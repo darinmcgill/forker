@@ -1,27 +1,16 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import sys
-import socket
-import select
 import os
-import time
-import glob
-import stat
 import re
-import datetime
-import base64
-import hashlib
-import struct
-import random
-
-
+from Request import Request
+from listen import listen
 
 
 def main(*args):
     port = 8080
     forking = (os.name == 'posix')
     reporting = False
-    ws = False
     for arg in args:
         if re.match(r"^\d+$",arg):
             port = int(arg)
@@ -35,18 +24,16 @@ def main(*args):
         if os.path.exists(arg):
             os.chdir(arg)
             continue
-
-
+    for sock, addr in listen(port, forking):
+        request = Request(sock=sock, remote_ip=addr[0])
+        if reporting:
+            out = b"HTTP/1.0 200 OK\r\n"
+            out += b"Content-type: text/plain\r\n\r\n"
+            out += bytes(request)
+            sock.sendall(out)
+            print(request)
         else:
-            request = Request(sock=sock, remote_ip=addr[0], request_id=fork_id)
-            if reporting:
-                out = b"HTTP/1.0 200 OK\r\n"
-                out += b"Content-type: text/plain\r\n\r\n"
-                out += bytes(request)
-                sock.sendall(out)
-                print(request)
-            else:
-                sock.sendall(request.serve())
+            sock.sendall(request.serve())
         sock.close()
         if forking:
             sys.exit(0)
