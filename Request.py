@@ -7,7 +7,6 @@ import socket
 import base64
 import glob
 import stat
-import copy
 
 
 class Request(object):
