@@ -6,9 +6,10 @@ import socket
 import sys
 import select
 import struct
+from Request import Request
 
 
-_magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+_magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
 def _sha1(x):
@@ -16,7 +17,7 @@ def _sha1(x):
 
 
 def _sign(x):
-    return base64.encodebytes(_sha1(x + _magic)).strip()
+    return base64.encodestring(_sha1(x + _magic)).strip()
 
 
 def _ignore(*a, **b):
@@ -60,37 +61,26 @@ countWebSocketServer = 0
 
 class WebSocketServer(object):
 
-    def __init__(self, soc):
-        assert isinstance(soc, socket.socket), type(soc)
-        self.soc = soc
-        self.fd = soc.fileno()
+    def __init__(self, sock, request=None, verbose=False):
+        self.verbose = verbose
+        if not request:
+            request = Request(sock=sock)
+        if self.verbose:
+            print(request)
+        assert isinstance(sock, socket.socket), type(sock)
+        self.soc = sock
+        self.fd = sock.fileno()
         self.verbose = False
         self.closed = False
         self.data = ""
-        buff = ""
-        while "\r\n\r\n" not in buff:
-            buff += self.soc.recv(4096)
         self.last_recv = time.time()
-        lines = buff.split("\r\n")
-        first = lines.pop(0)
-        self.method, self.loc, self.prot = first.split()
-        self.fields = dict()
-        for line in lines:
-            if line == "":
-                continue
-            k, v = line.split(":", 1)
-            k, v = k.strip().lower(), v.strip()
-            self.fields[k] = v
-            if self.verbose:
-                sys.stdout.write("=>%s<=>%s<=" % (k, v))
-                print()
-        sig = _sign(self.fields["sec-websocket-key"])
-        out = ""
-        out += "HTTP/1.1 101 Switching Protocols\r\n"
-        out += "Upgrade: websocket\r\n"
-        out += "Connection: Upgrade\r\n"
-        out += "Sec-WebSocket-Accept: %s\r\n" % sig
-        out += "\r\n"
+        sig = _sign(request.headers["sec-websocket-key"].encode())
+        out = b""
+        out += b"HTTP/1.1 101 Switching Protocols\r\n"
+        out += b"Upgrade: websocket\r\n"
+        out += b"Connection: Upgrade\r\n"
+        out += ("Sec-WebSocket-Accept: %s\r\n" % sig).encode()
+        out += b"\r\n"
         self.soc.sendall(out)
         self.lastSend = time.time()
         if self.verbose:
@@ -241,9 +231,9 @@ class WebSocketServer(object):
 
 if __name__ == "__main__":
     from listen import listen
-    for sock, addr in listen(port=8080, forking=False):
+    for sock1, addr in listen(port=8080, forking=False):
         print("running WebSocketServer in echo mode", file=sys.stderr)
-        ws = WebSocketServer(sock)
+        ws = WebSocketServer(sock1, verbose=True)
         while True:
             for thing in ws.recvall():
                 print("echoing: %r" % thing)
