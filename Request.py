@@ -7,12 +7,11 @@ import socket
 import base64
 import glob
 import stat
-import unittest
 
 
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
-                 "requested_path", "headers", "cookies", "body", "query_string", )
+                 "requested_path", "headers", "cookies", "body", "query_string", "verbose")
 
     OK = b"HTTP/1.0 200 OK\r\n"
 
@@ -22,6 +21,7 @@ class Request(object):
              or
             Request(<contents>)
         """
+        self.verbose = False
         if "sock" not in kwargs:
             for k, v in kwargs.items():
                 setattr(self, k, v)
@@ -137,22 +137,24 @@ class Request(object):
 
     def serve(self):
         try:
-            resolved = Request.resolve(self.requested_path, os.getcwd())
+            resolved = self.resolve(self.requested_path, os.getcwd())
         except KeyError:
             return b"HTTP/1.0 404 Not Found\r\n\r\n404 Not Found"
         if os.path.isdir(resolved):
             if "x-forwarded-uri" in self.headers:
                 self.requested_path = self.headers["x-forwarded-uri"]
-            return Request.get_listing(resolved, self.requested_path)
+            return self.get_listing(resolved, self.requested_path)
         if Request.is_executable(resolved):
             return self.cgi(resolved)
         if self.method == "GET":
-            return Request.OK + Request.type_line(resolved) + b"\r\n" + open(resolved, "rb").read()
+            with open(resolved, "rb") as handle:
+                contents = handle.read()
+            return Request.OK + Request.type_line(resolved) + b"\r\n" + contents
         return b"HTTP/1.0 500 Unexpected\r\n\r\n500 Unexpected\n" + bytes(self)
 
-    @staticmethod
-    def get_listing(resolved, raw):
-        print("getListing(%r,%r)" % (resolved, raw))
+    def get_listing(self, resolved, raw):
+        if self.verbose:
+            print("getListing(%r,%r)" % (resolved, raw))
         assert os.path.isdir(resolved)
         out = b"HTTP/1.0 200 OK\r\n"
         out += b"Content-type: text/html\r\n\r\n"
@@ -179,30 +181,30 @@ class Request(object):
         out += b"</pre></font></body></html>"
         return out
 
-    @staticmethod
-    def resolve(path, relative):
-        print("resolve(%r,%r)" % (path, relative))
+    def resolve(self, path, relative):
+        if self.verbose:
+            print("resolve(%r,%r)" % (path, relative))
         if not isinstance(path, list):
             path = [p for p in path.split("/") if p]
         assert isinstance(path, list)
         assert os.path.exists(relative), relative
         if os.path.islink(relative):
-            return Request.resolve(path, os.path.realpath(relative))
+            return self.resolve(path, os.path.realpath(relative))
         if os.path.isfile(relative):
             return relative
         assert os.path.isdir(relative), relative
         if len(path) == 0:
             try:
-                return Request.resolve(["index"], relative)
+                return self.resolve(["index"], relative)
             except:
                 return relative
         name = path.pop(0)
         contents = os.listdir(relative)  # does not include ".." and "."
         if name in contents:
-            return Request.resolve(path, os.path.join(relative, name))
+            return self.resolve(path, os.path.join(relative, name))
         matches = [x for x in contents if x.startswith(name + ".")]
         if len(matches) == 1:
-            return Request.resolve([], os.path.join(relative, matches[0]))
+            return self.resolve([], os.path.join(relative, matches[0]))
         if len(matches) > 1:
             raise KeyError("ambiguous:" + os.path.join(relative, name))
         raise KeyError(os.path.join(relative, name))
@@ -213,7 +215,7 @@ class Request(object):
         return bool(stat.S_IXOTH & mode)
 
     @staticmethod
-    def readable(path):
+    def is_readable(path):
         mode = os.stat(path).st_mode
         return bool(stat.S_IROTH & mode)
 
@@ -235,43 +237,3 @@ class Request(object):
                 return b"Content-type: " + v + b"\r\n"
         return b""  # let the browser guess
 
-
-_example_request = b"""GET /abc?xyz HTTP/1.1
-Host: localhost:8080
-Upgrade-Insecure-Requests: 1
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-Accept-Encoding: gzip, deflate, sdch, br
-Accept-Language: en-US,en;q=0.8
-Cookie:trail=6231214290744395; scent=6457421329820405
-
-"""
-
-
-class TestRequest(unittest.TestCase):
-
-    def test_socket(self):
-        test_data = b"hello\nworld!"
-        client, server = socket.socketpair()
-        client.send(test_data)
-        buff = server.recv(4096)
-        self.assertEqual(buff, test_data)
-        client.close()
-        server.close()
-
-    def test_request(self):
-        client, server = socket.socketpair()
-        client.send(_example_request)
-        request = Request(sock=server)
-        client.close()
-        server.close()
-        self.assertEqual(request.method, "GET")
-        self.assertEqual(request.requested_path, "/abc")
-        self.assertEqual(request.query_string, "xyz")
-        self.assertEqual(request.headers["host"], "localhost:8080")
-        self.assertFalse(request.body)
-        self.assertEqual(request.cookies.get("scent"), "6457421329820405")
-        self.assertEqual(request.cookies.get("trail"), "6231214290744395")
-
-
-if __name__ == "__main__":
-    unittest.main()
