@@ -34,7 +34,6 @@ def main(*args):
             print(request)
         else:
             sock.sendall(request.serve())
-            print(repr(request))
         sock.close()
         if forking:
             sys.exit(0)

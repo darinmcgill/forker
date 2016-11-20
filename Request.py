@@ -7,6 +7,7 @@ import socket
 import base64
 import glob
 import stat
+import copy
 
 
 class Request(object):
@@ -16,12 +17,11 @@ class Request(object):
     OK = b"HTTP/1.0 200 OK\r\n"
 
     def __init__(self, **kwargs):
-        """
-            Request(sock, remote_ip=None, request_id=None)
-             or
-            Request(<contents>)
-        """
+        self.body = b""
         self.verbose = False
+        self.headers = {}
+        self.remote_ip = ""
+        self.method = "GET"
         if "sock" not in kwargs:
             for k, v in kwargs.items():
                 setattr(self, k, v)
@@ -43,7 +43,6 @@ class Request(object):
             self.method, request_string, self.protocol = first.split()
             self.requested_path = request_string.split("?")[0]
             self.query_string = request_string.split("?", 1)[1] if "?" in request_string else ""
-            self.headers = dict()
             for line in lines:
                 a, b = line.split(":", 1)
                 self.headers[a.strip().lower()] = b.strip()
@@ -81,7 +80,7 @@ class Request(object):
         print(repr([ts, self.requested_path, self.method, self.remote_ip]), file=file)
 
     def cgi(self, resolved):
-        for k in os.environ.keys():
+        for k in list(os.environ.keys()):
             if k in ["PATH", "PYTHONPATH"]:
                 continue
             del os.environ[k]
@@ -127,7 +126,7 @@ class Request(object):
         body = m.group(2)
         lines = re.split(b"\\r?\\n", header)
         status = Request.OK
-        header = ""
+        header = b""
         for line in lines:
             if re.match(b"^status:$", line, re.I):
                 status = b"HTTP/1.0 " + line.split(b":")[1] + b"\r\n"

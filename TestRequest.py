@@ -38,16 +38,22 @@ class TestRequest(unittest.TestCase):
         self.assertEqual(request.cookies.get("trail"), "6231214290744395")
 
     def test_listing(self):
-        r = Request(method='GET', requested_path='/', headers={})
+        r = Request(requested_path='/')
         out = r.serve()
         line = b"<a href='/README.md'>README.md</a>"
         self.assertTrue(line in out)
 
     def test_read(self):
         magic = b"Y43j99j8p4Mk8S8B"
-        r = Request(method='GET', requested_path='/TestRequest.py', headers={})
+        r = Request(requested_path='/TestRequest.py')
         out = r.serve()
         self.assertTrue(magic in out)
+
+    def test_cgi(self):
+        r = Request(requested_path='/cgi.sh', query_string="abc")
+        out = r.serve()
+        # print(out.decode())
+        self.assertTrue(b"QUERY_STRING=abc" in out)
 
 
 if __name__ == "__main__":
