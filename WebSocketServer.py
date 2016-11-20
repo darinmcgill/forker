@@ -197,3 +197,14 @@ class WebSocketServer(object):
         if opcode == TEXT:
             return payload
         raise Exception("bad opcode")
+
+if __name__ == "__main__":
+    for sock, addr, fork_id in listen(port=port, forking=forking):
+        if ws:
+            print("running WebSocketServer in echo mode")
+            ws = WebSocketServer(sock)
+            while True:
+                for thing in ws.recvall():
+                    print("echoing: %r" % thing)
+                    how = BIN if isinstance(thing, bytearray) else TEXT
+                    ws.send(thing, how)
