@@ -6,9 +6,9 @@ import os
 import re
 from .Request import Request
 from .listen import listen
-from .WebSocketServer import WebSocketServer
+from .WebSocketServer import WebSocketServer, TEXT, BIN, Closed
 
-__all__ = [Request, listen, WebSocketServer]
+__all__ = [Request, listen, WebSocketServer, TEXT, BIN, Closed]
 
 
 def main(*args):

@@ -261,7 +261,7 @@ class WebSocketServer(object):
         raise Exception("bad opcode")
 
 if __name__ == "__main__":
-    from listen import listen
+    from .listen import listen
     for sock1, addr in listen(port=8080, forking=False):
         print("running WebSocketServer in echo mode", file=sys.stderr)
         ws = WebSocketServer(sock1)
