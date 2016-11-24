@@ -15,7 +15,6 @@ HELLO_WORLD = b"Hello world!\n"
 
 
 def simple_app(environ, start_response):
-    """Simplest possible application object"""
     status = environ and '200 OK'
     response_headers = [('Content-type', 'text/plain')]
     start_response(status, response_headers)
@@ -88,7 +87,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(isinstance(out, bytes))
         self.assertTrue(b'\r\n\r\n' in out)
         self.assertTrue(HELLO_WORLD in out)
-        self.assertTrue(out.lower().startswith(b'HTTP/1.0 200 OK'))
+        self.assertTrue(out.startswith(b'HTTP/1.0 200 OK'))
 
     def test_wsgi2(self):
         client, server = socket.socketpair()
@@ -100,7 +99,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(isinstance(out, bytes))
         self.assertTrue(b'\r\n\r\n' in out)
         self.assertTrue(HELLO_WORLD in out)
-        self.assertTrue(out.lower().startswith(b'HTTP/1.0 200 OK'))
+        self.assertTrue(out.startswith(b'HTTP/1.0 200 OK'))
 
 
 if __name__ == "__main__":

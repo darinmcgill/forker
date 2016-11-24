@@ -36,7 +36,7 @@ def listen(port=8081, forking=True):
             yield (new_sock, addr)
 
 if __name__ == "__main__":
-    for sock, addr in listen(8080, False):
+    for sock, xxx in listen(8080, False):
         while True:
             data = sock.recv(4096)
             if not data:

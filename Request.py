@@ -23,13 +23,12 @@ class Request(object):
         self.headers = {}
         self.remote_ip = ""
         self.method = "GET"
-        if "sock" not in kwargs:
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-        else:
+        for k, v in kwargs.items():
+            if k == "sock":
+                continue
+            setattr(self, k, v)
+        if "sock" in kwargs:
             sock = kwargs["sock"]
-            self.remote_ip = kwargs.get("remote_ip")
-            self.request_id = kwargs.get("request_id")
             buff = b""
             match = None
             while not match:
@@ -244,9 +243,9 @@ class Request(object):
         :return: A "bytes" object which can be sent to the client.
         """
         written = list()
-        error_io = StringIO('')
+        error_io = StringIO()
         environ = dict()
-        for k, v in self.headers:
+        for k, v in self.headers.items():
             if k == "content-type":
                 continue
             new_key = "HTTP_" + k.replace("-", "_").upper()
