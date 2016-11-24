@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest
-from Request import *
+from forker import Request
+import socket
 
 _example_request = b"""GET /README.md?xyz HTTP/1.1
 Host: localhost:8080
@@ -62,7 +63,7 @@ class TestRequest(unittest.TestCase):
     def test_listing(self):
         r = Request(requested_path='/')
         out = r.serve()
-        line = b"<a href='/README.md'>README.md</a>"
+        line = b"<a href='/cgi_example.sh'>cgi_example.sh</a>"
         self.assertTrue(line in out)
 
     def test_read(self):
@@ -72,7 +73,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(magic in out)
 
     def test_cgi(self):
-        r = Request(requested_path='/cgi.sh', query_string="abc")
+        r = Request(requested_path='/cgi_example.sh', query_string="abc")
         out = r.serve()
         # print(out.decode())
         self.assertTrue(b"QUERY_STRING=abc" in out)

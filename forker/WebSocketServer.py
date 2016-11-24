@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 import hashlib
 import base64
 import time
@@ -6,7 +7,7 @@ import socket
 import sys
 import select
 import struct
-from Request import Request
+from .Request import Request
 
 
 _magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"

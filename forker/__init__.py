@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from __future__ import absolute_import
 import sys
 import os
 import re
-from Request import Request
-from listen import listen
+from .Request import Request
+from .listen import listen
+from .WebSocketServer import WebSocketServer
+
+__all__ = [Request, listen, WebSocketServer]
 
 
 def main(*args):
