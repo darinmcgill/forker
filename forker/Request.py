@@ -28,6 +28,7 @@ class Request(object):
         self.headers = {}
         self.remote_ip = ""
         self.method = "GET"
+        self.query_string = None
         for k, v in kwargs.items():
             if k == "sock":
                 continue

@@ -1,7 +1,10 @@
+#!/usr/bin/env python
 from __future__ import print_function
 import unittest
 from forker import Request
 import socket
+import os
+import sys
 
 _example_request = b"""GET /README.md?xyz HTTP/1.1
 Host: localhost:8080
@@ -104,4 +107,6 @@ class TestRequest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append("..")
     unittest.main()
