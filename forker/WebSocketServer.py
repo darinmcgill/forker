@@ -9,9 +9,11 @@ import select
 import struct
 from .Request import Request
 
+if sys.version_info >= (3,0):
+    unicode = str
+
 
 _magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
 
 def my_ord(x):
     """
@@ -170,7 +172,13 @@ class WebSocketServer(object):
     def ping(self, payload=""):
         self.send(payload, kind=PING)
 
-    def send(self, payload, kind=TEXT):
+    def send(self, payload, kind=None):
+        if isinstance(payload, unicode):
+            payload = payload.encode()
+            kind = kind or TEXT
+        if isinstance(payload, (bytes, bytearray)):
+            kind = kind or BIN
+        assert kind, "TEXT or BIN not specified"
         if self.closed:
             raise Closed()
         msg = my_chr(128 | kind)

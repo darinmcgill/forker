@@ -7,7 +7,12 @@ import socket
 import base64
 import glob
 import stat
+import select
 from io import BytesIO, StringIO
+
+
+class Timeout(Exception):
+    pass
 
 
 class Request(object):
@@ -32,6 +37,9 @@ class Request(object):
             buff = b""
             match = None
             while not match:
+                selected = select.select([sock], [], [], 1)
+                if not selected[0]:
+                    raise Timeout()
                 buff += sock.recv(4096)
                 match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", buff, re.S)
             header_block = match.group(1)
@@ -58,7 +66,10 @@ class Request(object):
     def render(self, start, sep, end):
         out = start
         for key in self.__slots__:
-            out += "%s=%r%s" % (key, getattr(self, key), sep)
+            try:
+                out += "%s=%r%s" % (key, getattr(self, key), sep)
+            except AttributeError:
+                pass
         out += end
         return out
 
@@ -194,8 +205,8 @@ class Request(object):
         assert os.path.isdir(relative), relative
         if len(path) == 0:
             try:
-                return self.resolve(["index"], relative)
-            except:
+                return self.resolve(["index", "index.html"], relative)
+            except KeyError:
                 return relative
         name = path.pop(0)
         contents = os.listdir(relative)  # does not include ".." and "."
