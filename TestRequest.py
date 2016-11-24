@@ -11,6 +11,29 @@ Cookie:trail=6231214290744395; scent=6457421329820405
 
 """
 
+HELLO_WORLD = b"Hello world!\n"
+
+
+def simple_app(environ, start_response):
+    """Simplest possible application object"""
+    status = environ and '200 OK'
+    response_headers = [('Content-type', 'text/plain')]
+    start_response(status, response_headers)
+    return [HELLO_WORLD]
+
+
+class AppClass:
+
+    def __init__(self, environ, start_response):
+        self.environ = environ
+        self.start = start_response
+
+    def __iter__(self):
+        status = '200 OK'
+        response_headers = [('Content-type', 'text/plain')]
+        self.start(status, response_headers)
+        yield HELLO_WORLD
+
 
 class TestRequest(unittest.TestCase):
 
@@ -54,6 +77,30 @@ class TestRequest(unittest.TestCase):
         out = r.serve()
         # print(out.decode())
         self.assertTrue(b"QUERY_STRING=abc" in out)
+
+    def test_wsgi1(self):
+        client, server = socket.socketpair()
+        client.send(_example_request)
+        request = Request(sock=server)
+        client.close()
+        server.close()
+        out = request.wsgi(simple_app)
+        self.assertTrue(isinstance(out, bytes))
+        self.assertTrue(b'\r\n\r\n' in out)
+        self.assertTrue(HELLO_WORLD in out)
+        self.assertTrue(out.lower().startswith(b'HTTP/1.0 200 OK'))
+
+    def test_wsgi2(self):
+        client, server = socket.socketpair()
+        client.send(_example_request)
+        request = Request(sock=server)
+        client.close()
+        server.close()
+        out = request.wsgi(AppClass)
+        self.assertTrue(isinstance(out, bytes))
+        self.assertTrue(b'\r\n\r\n' in out)
+        self.assertTrue(HELLO_WORLD in out)
+        self.assertTrue(out.lower().startswith(b'HTTP/1.0 200 OK'))
 
 
 if __name__ == "__main__":

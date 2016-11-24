@@ -7,11 +7,13 @@ import socket
 import base64
 import glob
 import stat
+from io import BytesIO, StringIO
 
 
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
-                 "requested_path", "headers", "cookies", "body", "query_string", "verbose")
+                 "requested_path", "headers", "cookies", "body",
+                 "query_string", "verbose")
 
     OK = b"HTTP/1.0 200 OK\r\n"
 
@@ -235,3 +237,85 @@ class Request(object):
                 return b"Content-type: " + v + b"\r\n"
         return b""  # let the browser guess
 
+    def wsgi(self, application):
+        """
+        Passes the request to a wsgi application for processing.
+        :param application: A callable object as per the wsgi spec.
+        :return: A "bytes" object which can be sent to the client.
+        """
+        written = list()
+        error_io = StringIO('')
+        environ = dict()
+        for k, v in self.headers:
+            if k == "content-type":
+                continue
+            new_key = "HTTP_" + k.replace("-", "_").upper()
+            environ[new_key] = v
+        environ["CONTENT_TYPE"] = self.headers.get("content-type")
+        environ["REQUEST_METHOD"] = self.method
+        environ["PATH_INFO"] = self.requested_path
+        environ["QUERY_STRING"] = self.query_string
+        environ["CONTENT_TYPE"] = self.headers.get("content-type")
+        environ["CONTENT_LENGTH"] = str(len(self.body))
+        environ["SERVER_PROTOCOL"] = self.protocol
+        environ['SERVER_SOFTWARE'] = 'forker'
+        environ["SERVER_NAME"] = socket.gethostname()
+        environ["REMOTE_ADDR"] = self.remote_ip
+        environ['GATEWAY_INTERFACE'] = 'CGI/1.1'
+        environ['wsgi.input'] = BytesIO(self.body)
+        environ['wsgi.errors'] = error_io
+        environ['wsgi.version'] = (1, 0)
+        environ['wsgi.multithread'] = True
+        environ['wsgi.multiprocess'] = True
+        environ['wsgi.run_once'] = False
+
+        if environ.get('HTTPS', 'off') in ('on', '1'):
+            environ['wsgi.url_scheme'] = 'https'
+        else:
+            environ['wsgi.url_scheme'] = 'http'
+
+        headers_set = []
+        headers_sent = []
+
+        def write(data):
+            if not headers_set:
+                raise AssertionError("write() before start_response()")
+
+            if not headers_sent:
+                # Before the first output, send the stored headers
+                status, response_headers = headers_sent[:] = headers_set
+                written.append(('HTTP/1.0 %s\r\n' % status).encode())
+                for header in response_headers:
+                    written.append(('%s: %s\r\n' % header).encode())
+                written.append(b'\r\n')
+
+            written.append(data)
+
+        def start_response(status, response_headers, exc_info=None):
+            if exc_info:
+                try:
+                    error_io.write(str(exc_info))
+                finally:
+                    exc_info = None     # avoid dangling circular ref
+            elif headers_set:
+                raise AssertionError("Headers already set!")
+
+            headers_set[:] = [status, response_headers]
+            return exc_info or write
+
+        result = application(environ, start_response)
+        try:
+            for blob in result:
+                assert isinstance(blob, bytes), ("invalid bytestring:" + repr(blob))
+                if blob:    # don't send headers until body appears
+                    write(blob)
+            if not headers_sent:
+                write(b'')   # send headers now if body was empty
+        finally:
+            if hasattr(result, 'close'):
+                result.close()
+
+        error_msg = error_io.getvalue().encode()
+        if error_msg:
+            return b'Status: 500 WTF\r\n\r\n' + error_msg
+        return b''.join(written)
