@@ -146,7 +146,7 @@ class Request(object):
                 header += line + b"\r\n"
         return status + header + b"\r\n" + body
 
-    def serve(self):
+    def serve(self, allow_cgi=False):
         try:
             resolved = self.resolve(self.requested_path, os.getcwd())
         except KeyError:
@@ -155,7 +155,7 @@ class Request(object):
             if "x-forwarded-uri" in self.headers:
                 self.requested_path = self.headers["x-forwarded-uri"]
             return self.get_listing(resolved, self.requested_path)
-        if Request.is_executable(resolved):
+        if Request.is_executable(resolved) and allow_cgi:
             return self.cgi(resolved)
         if self.method == "GET":
             with open(resolved, "rb") as handle:

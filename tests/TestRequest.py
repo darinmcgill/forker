@@ -77,7 +77,7 @@ class TestRequest(unittest.TestCase):
 
     def test_cgi(self):
         r = Request(requested_path='/cgi_example.sh', query_string="abc")
-        out = r.serve()
+        out = r.serve(allow_cgi=True)
         # print(out.decode())
         self.assertTrue(b"QUERY_STRING=abc" in out)
 
