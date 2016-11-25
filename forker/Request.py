@@ -40,7 +40,7 @@ class Request(object):
             while not match:
                 selected = select.select([sock], [], [], 1)
                 if not selected[0]:
-                    raise Timeout()
+                    raise Timeout(buff.decode())
                 buff += sock.recv(4096)
                 match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", buff, re.S)
             header_block = match.group(1)
