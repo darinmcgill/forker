@@ -9,11 +9,11 @@ import select
 import struct
 from .Request import Request
 
-if sys.version_info >= (3,0):
+if sys.version_info >= (3, 0):
     unicode = str
 
-
 _magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
 
 def my_ord(x):
     """
@@ -85,14 +85,8 @@ class Close(Exception):
     pass
 
 
-class Closed(Exception):
-    pass
-
-
-countWebSocketServer = 0
-
-
 class WebSocketServer(object):
+    count = 0
 
     def __init__(self, sock, request=None, verbose=False):
         self.verbose = verbose
@@ -118,9 +112,8 @@ class WebSocketServer(object):
         self.lastSend = time.time()
         if self.verbose:
             print("=>%s<=" % out)
-        global countWebSocketServer
-        countWebSocketServer += 1
-        self.instance = countWebSocketServer
+        WebSocketServer.count += 1
+        self.instance = WebSocketServer.count
 
     def __hash__(self):
         return id(self)
@@ -131,7 +124,7 @@ class WebSocketServer(object):
     def recvall(self, timeout=None):
         # returns a list of strings
         if self.closed:
-            raise Closed()
+            raise ConnectionAbortedError()
         assert self.data == "", self.data
         out = list()
         rlist, wlist, xlist = select.select([self.fd], [], [], timeout)
@@ -180,7 +173,7 @@ class WebSocketServer(object):
             kind = kind or BIN
         assert kind, "TEXT or BIN not specified"
         if self.closed:
-            raise Closed()
+            raise ConnectionAbortedError()
         msg = my_chr(128 | kind)
         length = len(payload)
         if length <= 125:

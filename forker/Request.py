@@ -11,14 +11,10 @@ import select
 from io import BytesIO, StringIO
 
 
-class Timeout(Exception):
-    pass
-
-
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
                  "requested_path", "headers", "cookies", "body",
-                 "query_string", "verbose")
+                 "query_string", "verbose", "listening_port")
 
     OK = b"HTTP/1.0 200 OK\r\n"
 
@@ -40,8 +36,11 @@ class Request(object):
             while not match:
                 selected = select.select([sock], [], [], 1)
                 if not selected[0]:
-                    raise Timeout(buff.decode())
-                buff += sock.recv(4096)
+                    raise TimeoutError(buff.decode())
+                tmp = sock.recv(4096)
+                if not tmp:
+                    raise ConnectionAbortedError()
+                buff += tmp
                 match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", buff, re.S)
             header_block = match.group(1)
             if not isinstance(header_block, str):
