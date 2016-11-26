@@ -63,6 +63,17 @@ class Request(object):
                 while len(self.body) < int(self.headers["content-length"]):
                     self.body += sock.recv(4096)
 
+    def rdns(self):
+        if self.remote_ip.startswith("127."):
+            return None
+        if self.remote_ip.startswith("192.168"):
+            return None
+        try:
+            return socket.gethostbyaddr(self.remote_ip)[0]
+        except Exception as e:
+            sys.stderr.write("rdns: %s %s" % (type(e), e))
+            return None
+
     def render(self, start, sep, end):
         out = start
         for key in self.__slots__:
@@ -77,8 +88,10 @@ class Request(object):
         return self.render(sep=",", start="Request(", end=")")
 
     def __str__(self):
-        bar = ("-" * 40) + "\n"
-        return self.render(sep="\n\n", start=bar, end=bar)
+        target = self.requested_path
+        if self.query_string:
+                target = target + "?" + self.query_string
+        return "Request('%s')" % (target)
 
     def __bytes__(self):
         out = str(self)

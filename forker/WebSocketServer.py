@@ -132,7 +132,7 @@ class WebSocketServer(object):
             return list()
         self.data = self.soc.recv(4096)
         self.last_recv = time.time()
-        if self.data == "":
+        if self.data == b"":
             self.soc.close()
             self.closed = True
             return out
