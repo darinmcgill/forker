@@ -124,7 +124,7 @@ class WebSocketServer(object):
     def recvall(self, timeout=None):
         # returns a list of strings
         if self.closed:
-            raise ConnectionAbortedError()
+            raise StopIteration()
         assert self.data == "", self.data
         out = list()
         rlist, wlist, xlist = select.select([self.fd], [], [], timeout)
@@ -156,7 +156,7 @@ class WebSocketServer(object):
         msg = my_chr(128 | 8) + my_chr(0)
         try:
             self.soc.sendall(msg)
-        except:
+        except socket.error:
             pass
         finally:
             self.soc.close()
@@ -173,7 +173,7 @@ class WebSocketServer(object):
             kind = kind or BIN
         assert kind, "TEXT or BIN not specified"
         if self.closed:
-            raise ConnectionAbortedError()
+            raise StopIteration()
         msg = my_chr(128 | kind)
         length = len(payload)
         if length <= 125:
