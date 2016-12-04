@@ -14,7 +14,7 @@ from io import BytesIO, StringIO
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
                  "requested_path", "headers", "cookies", "body",
-                 "query_string", "verbose", "listening_port")
+                 "query_string", "verbose", "listening_port", "raw")
 
     OK = b"HTTP/1.0 200 OK\r\n"
 
@@ -25,23 +25,24 @@ class Request(object):
         self.remote_ip = ""
         self.method = "GET"
         self.query_string = None
+        self.raw = None
         for k, v in kwargs.items():
             if k == "sock":
                 continue
             setattr(self, k, v)
         if "sock" in kwargs:
             sock = kwargs["sock"]
-            buff = b""
+            self.raw = b""
             match = None
             while not match:
                 selected = select.select([sock], [], [], 1)
                 if not selected[0]:
-                    raise TimeoutError(buff.decode())
+                    raise TimeoutError(self.raw.decode())
                 tmp = sock.recv(4096)
                 if not tmp:
                     raise ConnectionAbortedError()
-                buff += tmp
-                match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", buff, re.S)
+                self.raw += tmp
+                match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", self.raw, re.S)
             header_block = match.group(1)
             if not isinstance(header_block, str):
                 header_block = header_block.decode()
@@ -61,7 +62,11 @@ class Request(object):
                     self.cookies[k] = v
             if "content-length" in self.headers:
                 while len(self.body) < int(self.headers["content-length"]):
-                    self.body += sock.recv(4096)
+                    tmp = sock.recv(4096)
+                    if not tmp:
+                        break
+                    self.body += tmp
+                    self.raw += tmp
 
     def rdns(self):
         if self.remote_ip.startswith("127."):
@@ -91,13 +96,10 @@ class Request(object):
         target = self.requested_path
         if self.query_string:
                 target = target + "?" + self.query_string
-        return "Request('%s')" % (target)
+        return "Request('%s')" % target
 
     def __bytes__(self):
-        out = str(self)
-        if not isinstance(out, bytes):
-            out = out.encode()
-        return out
+        return self.raw
 
     def log(self, file=sys.stdout):
         ts = str(datetime.datetime.now())

@@ -14,7 +14,7 @@ def listen(port=8081, forking=True):
     children = set()
     while True:
         try:
-            r, w, e = select.select([listener], [], [], 1)
+            r, w, e = select.select([listener], [], [])
             if r:
                 new_sock, addr = listener.accept()
             else:
