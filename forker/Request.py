@@ -60,6 +60,8 @@ class Request(object):
                 for cookie in re.split(";\s*", self.headers["cookie"]):
                     k, v = cookie.strip().split("=")
                     self.cookies[k] = v
+            if "x-real-ip" in self.headers:
+                self.remote_ip = self.headers["x-real-ip"]
             if "content-length" in self.headers:
                 while len(self.body) < int(self.headers["content-length"]):
                     tmp = sock.recv(4096)
