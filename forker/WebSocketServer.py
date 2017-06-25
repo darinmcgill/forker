@@ -90,10 +90,9 @@ class WebSocketServer(object):
 
     def __init__(self, sock, request=None, verbose=False):
         self.verbose = verbose
-        if not request:
-            request = Request(sock=sock)
+        self.request = request or Request(sock=sock)  # type: Request
         if self.verbose:
-            print(request)
+            print(self.request)
         assert isinstance(sock, socket.socket), type(sock)
         self.soc = sock
         self.fd = sock.fileno()
@@ -101,7 +100,7 @@ class WebSocketServer(object):
         self.closed = False
         self.data = ""
         self.last_recv = time.time()
-        sig = _sign(request.headers["sec-websocket-key"].encode())
+        sig = _sign(self.request.headers["sec-websocket-key"].encode())
         out = b""
         out += b"HTTP/1.1 101 Switching Protocols\r\n"
         out += b"Upgrade: websocket\r\n"
