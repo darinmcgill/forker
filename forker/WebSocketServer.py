@@ -102,7 +102,7 @@ class WebSocketServer(object):
         self.last_recv = time.time()
         sig = _sign(self.request.headers["sec-websocket-key"].encode())
         protocol = self.request.headers.get("sec-websocket-protocol", "")
-        protocol = protocol.split(b",")[0].strip().encode()
+        protocol = protocol.split(",")[0].strip().encode()
         out = b""
         out += b"HTTP/1.1 101 Switching Protocols\r\n"
         out += b"Upgrade: websocket\r\n"
