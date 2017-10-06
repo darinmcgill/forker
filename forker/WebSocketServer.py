@@ -101,11 +101,15 @@ class WebSocketServer(object):
         self.data = ""
         self.last_recv = time.time()
         sig = _sign(self.request.headers["sec-websocket-key"].encode())
+        protocol = self.request.headers.get("sec-websocket-protocol", "")
+        protocol = protocol.split(b",")[0].strip().encode()
         out = b""
         out += b"HTTP/1.1 101 Switching Protocols\r\n"
         out += b"Upgrade: websocket\r\n"
         out += b"Connection: Upgrade\r\n"
         out += b"Sec-WebSocket-Accept: " + sig + b"\r\n"
+        if protocol:
+            out += b"Sec-WebSocket-Protocol: " + protocol + b"\r\n"
         out += b"\r\n"
         self.soc.sendall(out)
         self.lastSend = time.time()
