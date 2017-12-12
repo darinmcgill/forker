@@ -35,14 +35,14 @@ class Request(object):
             self.raw = b""
             match = None
             while not match:
-                selected = select.select([sock], [], [], 1)
+                selected = select.select([sock], [], [], 0.1)
                 if not selected[0]:
-                    raise TimeoutError(self.raw.decode())
+                    raise TimeoutError(repr(self.raw))
                 tmp = sock.recv(4096)
                 if not tmp:
                     raise ConnectionAbortedError()
                 self.raw += tmp
-                match = re.match(b"(.*?)\\r?\\n\\r?\\n(.*)", self.raw, re.S)
+                match = re.match(br"(.*?)\r?\n\r?\n(.*)", self.raw, re.S)
             header_block = match.group(1)
             if not isinstance(header_block, str):
                 header_block = header_block.decode()
