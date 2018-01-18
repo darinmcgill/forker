@@ -1,3 +1,4 @@
+from __future__ import print_function
 from .Request import Request
 from .listen import listen
 import sys
@@ -9,6 +10,7 @@ def main(*args):
     port = 8080
     forking = (os.name == 'posix')
     reporting = False
+    cgi = False
     for arg in args:
         if re.match(r"^\d+$", arg):
             port = int(arg)
@@ -18,6 +20,9 @@ def main(*args):
             continue
         if arg == "report":
             reporting = True
+            continue
+        if arg == "cgi":
+            cgi = True
             continue
         if os.path.exists(arg):
             os.chdir(arg)
@@ -29,9 +34,9 @@ def main(*args):
             out += b"Content-type: text/plain\r\n\r\n"
             out += bytes(request)
             sock.sendall(out)
-            print(request)
+            print(repr(request))
         else:
-            sock.sendall(request.serve())
+            sock.sendall(request.serve(allow_cgi=cgi))
         sock.close()
         if forking:
             sys.exit(0)

@@ -137,8 +137,8 @@ class Request(object):
             "x-forwarded-request-uri", "")
         if "Basic" in self.headers.get("authorization", ""):
             second = self.headers["authorization"].split()[1]
-            user = base64.decodebytes(second).split(":")[0]
-            os.environ["HTTP_X_AUTH_USER"] = user
+            user = base64.decodestring(second.encode()).split(b":")[0]
+            os.environ["HTTP_X_AUTH_USER"] = user.decode()
         from subprocess import Popen, PIPE
         child = Popen(resolved, stdin=PIPE, stdout=PIPE)
         out, err = child.communicate(self.body or b"")
