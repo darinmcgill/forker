@@ -10,6 +10,17 @@ import stat
 import select
 from io import BytesIO, StringIO
 
+if sys.version_info < (3, 3):
+
+    class TimeoutError(Exception):
+        pass
+
+    class ConnectionAbortedError(Exception):
+        pass
+
+Timeout = TimeoutError
+Aborted = ConnectionAbortedError
+
 
 class Request(object):
     __slots__ = ("request_id", "remote_ip", "protocol", "method",
@@ -37,10 +48,10 @@ class Request(object):
             while not match:
                 selected = select.select([sock], [], [], 0.1)
                 if not selected[0]:
-                    raise TimeoutError(repr(self.raw))
+                    raise Timeout(repr(self.raw))
                 tmp = sock.recv(4096)
                 if not tmp:
-                    raise ConnectionAbortedError()
+                    raise Aborted()
                 self.raw += tmp
                 match = re.match(br"(.*?)\r?\n\r?\n(.*)", self.raw, re.S)
             header_block = match.group(1)
