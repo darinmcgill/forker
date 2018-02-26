@@ -1,13 +1,13 @@
-# forker
 
 Copyright Darin McGill, 2015 
 License: GPL v 3.0
 
 The module forker.py is a simple synchronous forking web server.
-It's written in pure python 2.7 and has no external dependencies other than 
+It's written in pure python and has no external dependencies other than 
 the standard python library.  It includes a web socket server and an 
-implementation of CGI.  It's primarily intended to be used behind a reverse 
-proxy such as nginx, but can also be used for testing/development in a pinch.
+implementations of CGI and WSGI.  It's primarily intended to be used behind 
+a reverse  proxy such as nginx, but can also be used for testing/development 
+in a pinch.
 
 This project was inspired by difficulties encountered using thttpd, 
 specifically the limitation that sim links could not point outside the
@@ -36,9 +36,3 @@ module, but makes debugging easier.)
 
 On Windows:
     Basic file serving works, but CGI does not.  Also, "nofork" is implied.
-
-TODO:
-
-* implment CGI on windows
-* add WSGI adapter
-* make compatible with Python 3
