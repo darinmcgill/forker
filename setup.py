@@ -19,5 +19,5 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     keywords='wsgi cgi websocket websockets forking http',
-    packages='forker',  
+    packages=['forker'],  
 )
