@@ -5,6 +5,7 @@ from forker import Request
 import socket
 import os
 import sys
+import re
 
 _example_request = b"""GET /README.md?xyz HTTP/1.1
 Host: localhost:8080
@@ -78,7 +79,8 @@ class TestRequest(unittest.TestCase):
     def test_cgi(self):
         r = Request(requested_path='/cgi_example.sh', query_string="abc")
         out = r.serve(allow_cgi=True)
-        # print(out.decode())
+        print(out.decode())
+        self.assertTrue(re.match(b"HTTP/1.. 201", out))
         self.assertTrue(b"QUERY_STRING=abc" in out)
 
     def test_wsgi1(self):

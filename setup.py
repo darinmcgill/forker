@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='forker',
-    version='0.1.1',
+    version='0.1.2',
     description='A forking webserver and websocket server.',
     url='https://github.com/darinmcgill/forker',
     author='Darin McGill',

@@ -167,8 +167,9 @@ class Request(object):
         status = Request.OK
         header = b""
         for line in lines:
-            if re.match(b"^status:$", line, re.I):
-                status = b"HTTP/1.0 " + line.split(b":")[1] + b"\r\n"
+            status_match = re.match(b"^status:\s*(.*)", line, re.I)
+            if status_match:
+                status = b"HTTP/1.0 " + status_match.group(1) + b"\r\n"
             else:
                 header += line + b"\r\n"
         return status + header + b"\r\n" + body

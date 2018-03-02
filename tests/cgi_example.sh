@@ -1,5 +1,6 @@
 #!/bin/bash
 echo "Content-type: text/plain"
+echo "Status: 201 whatever"
 echo
 printenv
 echo "------------------------"
