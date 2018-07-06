@@ -18,6 +18,11 @@ if sys.version_info < (3, 3):
     class ConnectionAbortedError(Exception):
         pass
 
+else:
+    TimeoutError = TimeoutError
+    ConnectionAbortedError = ConnectionAbortedError
+
+
 Timeout = TimeoutError
 Aborted = ConnectionAbortedError
 
