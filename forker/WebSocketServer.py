@@ -56,6 +56,7 @@ def _sign(x):
 def _ignore(*a, **b):
     return a, b
 
+
 CONT = 0
 TEXT = 1
 BIN = 2
@@ -263,6 +264,7 @@ class WebSocketServer(object):
         if opcode == TEXT:
             return payload
         raise Exception("bad opcode")
+
 
 if __name__ == "__main__":
     from .listen import listen
