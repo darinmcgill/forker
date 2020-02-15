@@ -1,12 +1,15 @@
-from __future__ import print_function
 import socket
 import select
 import os
 import sys
 import random
+from typing import Generator, Tuple
+Address = Tuple[str, int]
+Socket = socket.socket
+__all__ = ["Address", "Socket", "listen"]
 
 
-def listen(port=8081, forking=True):
+def listen(port=8081, forking=True) -> Generator[Tuple[Socket, Address], None, None]:
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind(('', port))
@@ -33,7 +36,8 @@ def listen(port=8081, forking=True):
         else:
             if forking:
                 listener.close()
-            yield (new_sock, addr)
+            yield new_sock, addr
+
 
 if __name__ == "__main__":
     for sock, xxx in listen(8080, False):

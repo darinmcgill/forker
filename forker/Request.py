@@ -9,17 +9,9 @@ import glob
 import stat
 import select
 from io import BytesIO, StringIO
-
-if sys.version_info < (3, 3):
-
-    class TimeoutError(Exception):
-        pass
-
-    class ConnectionAbortedError(Exception):
-        pass
-
-Timeout = TimeoutError
-Aborted = ConnectionAbortedError
+from typing import Optional
+from .listen import Socket
+__all__ = ["Request"]
 
 
 class Request(object):
@@ -29,7 +21,11 @@ class Request(object):
 
     OK = b"HTTP/1.0 200 OK\r\n"
 
-    def __init__(self, **kwargs):
+    def __init__(self, sock: Optional[Socket] = None, **kwargs):
+        """
+        :param kwargs: Keywords to pass to initialize this object, get added to self, except 'sock' which
+        if present will be used to
+        """
         self.body = b""
         self.verbose = False
         self.headers = {}
@@ -41,17 +37,16 @@ class Request(object):
             if k == "sock":
                 continue
             setattr(self, k, v)
-        if "sock" in kwargs:
-            sock = kwargs["sock"]
+        if sock is not None:
             self.raw = b""
             match = None
             while not match:
                 selected = select.select([sock], [], [], 0.1)
                 if not selected[0]:
-                    raise Timeout(repr(self.raw))
+                    raise TimeoutError(repr(self.raw))
                 tmp = sock.recv(4096)
                 if not tmp:
-                    raise Aborted()
+                    raise ConnectionAbortedError()
                 self.raw += tmp
                 match = re.match(br"(.*?)\r?\n\r?\n(.*)", self.raw, re.S)
             header_block = match.group(1)
@@ -68,7 +63,7 @@ class Request(object):
                 self.headers[a.strip().lower()] = b.strip()
             self.cookies = dict()
             if "cookie" in self.headers:
-                for cookie in re.split(";\s*", self.headers["cookie"]):
+                for cookie in re.split(r";\s*", self.headers["cookie"]):
                     k, v = cookie.strip().split("=")
                     self.cookies[k] = v
             if "x-real-ip" in self.headers:
@@ -81,7 +76,10 @@ class Request(object):
                     self.body += tmp
                     self.raw += tmp
 
-    def rdns(self):
+    def rdns(self) -> Optional[str]:
+        """
+        :return: The entry for the remote dns.
+        """
         if self.remote_ip.startswith("127."):
             return None
         if self.remote_ip.startswith("192.168"):
@@ -92,7 +90,7 @@ class Request(object):
             sys.stderr.write("rdns: %s %s" % (type(e), e))
             return None
 
-    def render(self, start, sep, end):
+    def _render(self, start, sep, end):
         out = start
         for key in self.__slots__:
             try:
@@ -103,22 +101,32 @@ class Request(object):
         return out
 
     def __repr__(self):
-        return self.render(sep=",", start="Request(", end=")")
+        return self._render(sep=",", start="Request(", end=")")
 
     def __str__(self):
         target = self.requested_path
         if self.query_string:
-                target = target + "?" + self.query_string
+            target = target + "?" + self.query_string
         return "Request('%s')" % target
 
     def __bytes__(self):
         return self.raw
 
     def log(self, file=sys.stdout):
+        """
+        Print a summary to :file:, which defaults to stdout
+        :param file:
+        :return:
+        """
         ts = str(datetime.datetime.now())
         print(repr([ts, self.requested_path, self.method, self.remote_ip]), file=file)
 
-    def cgi(self, resolved):
+    def _cgi(self, resolved):
+        """
+        Process this request using the CGI protocol with the associated file.
+        :param resolved: file on the local filesystem
+        :return:
+        """
         for k in list(os.environ.keys()):
             if k in ["PATH", "PYTHONPATH"]:
                 continue
@@ -148,7 +156,7 @@ class Request(object):
             "x-forwarded-request-uri", "")
         if "Basic" in self.headers.get("authorization", ""):
             second = self.headers["authorization"].split()[1]
-            user = base64.decodestring(second.encode()).split(b":")[0]
+            user = base64.decodebytes(second.encode()).split(b":")[0]
             os.environ["HTTP_X_AUTH_USER"] = user.decode()
         from subprocess import Popen, PIPE
         child = Popen(resolved, stdin=PIPE, stdout=PIPE)
@@ -167,7 +175,7 @@ class Request(object):
         status = Request.OK
         header = b""
         for line in lines:
-            status_match = re.match(b"^status:\s*(.*)", line, re.I)
+            status_match = re.match(br"^status:\s*(.*)", line, re.I)
             if status_match:
                 status = b"HTTP/1.0 " + status_match.group(1) + b"\r\n"
             else:
@@ -184,7 +192,7 @@ class Request(object):
                 self.requested_path = self.headers["x-forwarded-uri"]
             return self.get_listing(resolved, self.requested_path)
         if Request.is_executable(resolved) and allow_cgi:
-            return self.cgi(resolved)
+            return self._cgi(resolved)
         if self.method == "GET":
             with open(resolved, "rb") as handle:
                 contents = handle.read()
