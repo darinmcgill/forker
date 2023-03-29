@@ -1,4 +1,3 @@
-from __future__ import print_function
 import re
 import sys
 import datetime
@@ -10,13 +9,6 @@ import stat
 import select
 from io import BytesIO, StringIO
 
-if sys.version_info < (3, 3):
-
-    class TimeoutError(Exception):
-        pass
-
-    class ConnectionAbortedError(Exception):
-        pass
 
 Timeout = TimeoutError
 Aborted = ConnectionAbortedError
@@ -44,16 +36,13 @@ class Request(object):
         if "sock" in kwargs:
             sock = kwargs["sock"]
             self.raw = b""
-            match = None
-            while not match:
-                selected = select.select([sock], [], [], 0.1)
-                if not selected[0]:
-                    raise Timeout(repr(self.raw))
-                tmp = sock.recv(4096)
-                if not tmp:
-                    raise Aborted()
-                self.raw += tmp
-                match = re.match(br"(.*?)\r?\n\r?\n(.*)", self.raw, re.S)
+            tmp = sock.recv(10*4096)
+            if not tmp:
+                raise Aborted()
+            self.raw += tmp
+            match = re.match(br"(.*?)\r?\n\r?\n(.*)", self.raw, re.S)
+            if not match:
+                print("did not see end of headers!", file=sys.stderr)
             header_block = match.group(1)
             if not isinstance(header_block, str):
                 header_block = header_block.decode()
@@ -68,8 +57,8 @@ class Request(object):
                 self.headers[a.strip().lower()] = b.strip()
             self.cookies = dict()
             if "cookie" in self.headers:
-                for cookie in re.split(";\s*", self.headers["cookie"]):
-                    k, v = cookie.strip().split("=")
+                for cookie in re.split(r";\s*", self.headers["cookie"]):
+                    k, v = cookie.strip().split("=", 1)
                     self.cookies[k] = v
             if "x-real-ip" in self.headers:
                 self.remote_ip = self.headers["x-real-ip"]
@@ -108,7 +97,7 @@ class Request(object):
     def __str__(self):
         target = self.requested_path
         if self.query_string:
-                target = target + "?" + self.query_string
+            target = target + "?" + self.query_string
         return "Request('%s')" % target
 
     def __bytes__(self):
@@ -167,12 +156,16 @@ class Request(object):
         status = Request.OK
         header = b""
         for line in lines:
-            status_match = re.match(b"^status:\s*(.*)", line, re.I)
+            status_match = re.match(rb"^status:\s*(.*)", line, re.I)
             if status_match:
                 status = b"HTTP/1.0 " + status_match.group(1) + b"\r\n"
             else:
                 header += line + b"\r\n"
         return status + header + b"\r\n" + body
+
+    @staticmethod
+    def length_line(data: bytes):
+        return b"Content-type: %d\r\n" % len(data)
 
     def serve(self, allow_cgi=False):
         try:
@@ -188,7 +181,11 @@ class Request(object):
         if self.method == "GET":
             with open(resolved, "rb") as handle:
                 contents = handle.read()
-            return Request.OK + Request.type_line(resolved) + b"\r\n" + contents
+            return (
+                Request.OK +
+                Request.type_line(resolved) +
+                Request.length_line(resolved) +
+                b"\r\n" + contents)
         return b"HTTP/1.0 500 Unexpected\r\n\r\n500 Unexpected\n" + bytes(self)
 
     def get_listing(self, resolved, raw):
@@ -326,6 +323,7 @@ class Request(object):
                 written.append(('HTTP/1.0 %s\r\n' % status).encode())
                 for header in response_headers:
                     written.append(('%s: %s\r\n' % header).encode())
+                written.append(b"Content-length: %d\r\n" % len(data))
                 written.append(b'\r\n')
 
             written.append(data)

@@ -1,4 +1,3 @@
-from __future__ import print_function
 from __future__ import absolute_import
 import hashlib
 import base64
@@ -55,6 +54,7 @@ def _sign(x):
 
 def _ignore(*a, **b):
     return a, b
+
 
 CONT = 0
 TEXT = 1
@@ -217,7 +217,7 @@ class WebSocketServer(object):
             length = struct.unpack("!Q", self.data[2:10])[0]
             offset += 8
         if masking:
-            mask = self.data[offset:(offset+4)]
+            mask = self.data[offset:(offset + 4)]
             offset += 4
         if self.verbose:
             print("-------------")
@@ -233,7 +233,7 @@ class WebSocketServer(object):
             self.last_recv = time.time()
             if self.verbose:
                 print("reading more...")
-        payload = self.data[offset:(offset+length)]
+        payload = self.data[offset:(offset + length)]
         if len(self.data) == offset + length:
             if self.verbose:
                 print("perfect length")
@@ -241,7 +241,7 @@ class WebSocketServer(object):
         else:
             if self.verbose:
                 print("extra stuff")
-            self.data = self.data[(offset+length):len(self.data)]
+            self.data = self.data[(offset + length):len(self.data)]
         if masking:
             payload = _unmask(payload, mask)
         if self.verbose:
@@ -264,8 +264,10 @@ class WebSocketServer(object):
             return payload
         raise Exception("bad opcode")
 
+
 if __name__ == "__main__":
     from .listen import listen
+
     for sock1, addr in listen(port=8080, forking=False):
         print("running WebSocketServer in echo mode", file=sys.stderr)
         ws = WebSocketServer(sock1)

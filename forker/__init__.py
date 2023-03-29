@@ -13,6 +13,4 @@ WEB_MIN = 0x10000000000000
 WEB_MAX = 0x1fffffffffffff
 
 
-__all__ = ["Request", "listen", "WebSocketServer", "TEXT", "BIN", "WEB_MIN", 
-           "WEB_MAX"]
-
+__all__ = ["Request", "listen", "WebSocketServer", "TEXT", "BIN", "WEB_MIN", "WEB_MAX"]
